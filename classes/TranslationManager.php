@@ -89,25 +89,26 @@ class TranslationManager
                     $options
                 );
 
-                // Set translated value in target context
-                $model->translateContext($targetLocale);
-                $model->setAttribute($attribute, $translatedValue);
-
                 $translated[$attribute] = $translatedValue;
 
                 \Log::info("Translated model {$model->id} attribute '{$attribute}' from {$sourceLocale} to {$targetLocale}");
 
-                // Switch back to source context for next iteration
-                $model->translateContext($sourceLocale);
             } catch (\Exception $e) {
                 \Log::error("Failed to translate attribute '{$attribute}' for model {$model->id}: " . $e->getMessage());
-                $model->translateContext($sourceLocale);
             }
         }
 
-        // Save the model with translations
+        // Save the model with translations in the target locale context
         if (!empty($translated)) {
+            // Switch to target locale and set all translated values
+            $model->translateContext($targetLocale);
+            foreach ($translated as $attribute => $value) {
+                $model->setAttribute($attribute, $value);
+            }
             $model->save();
+
+            // Reset to default locale after saving
+            $model->noFallbackLocale();
         }
 
         return $translated;
@@ -129,8 +130,6 @@ class TranslationManager
         $normalizedTarget = $this->normalizeLocaleForDeepL($targetLocale);
 
         if (!isset($availableLanguages[$normalizedTarget])) {
-            $suggestionsText = !empty($suggestions) ? " Similar languages available: " . implode(', ', $suggestions) : "";
-
             \Log::warning("Target language '{$targetLocale}' (normalized to '{$normalizedTarget}') is not supported by DeepL", [
                 'available_languages' => array_keys($availableLanguages)
             ]);
@@ -259,22 +258,27 @@ class TranslationManager
     {
         if (isset($model->translatable)) {
             $attributes = $model->translatable;
-            
+
             // Handle associative array format (with options)
             $result = [];
             foreach ($attributes as $key => $value) {
                 if (is_numeric($key)) {
                     // Simple string format
-                    $result[] = is_array($value) ? $value[0] : $value;
+                    $fieldName = is_array($value) ? $value[0] : $value;
                 } else {
                     // Key-value format
-                    $result[] = $key;
+                    $fieldName = $key;
+                }
+
+                // Filter out excluded fields using FieldFilter
+                if ($this->filter->shouldTranslate($fieldName)) {
+                    $result[] = $fieldName;
                 }
             }
-            
+
             return $result;
         }
-        
+
         return [];
     }
     

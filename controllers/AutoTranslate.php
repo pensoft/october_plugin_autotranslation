@@ -117,7 +117,6 @@ class AutoTranslate extends Controller
         $sourceLocale = post('source_locale');
         $targetLocales = post('target_locales', []);
         $modelIds = post('model_ids', []);
-        $selectedFields = post('selected_fields', []); // New: selected fields to translate
         $overwrite = (bool) post('overwrite', false);
 
         // Validation
@@ -141,11 +140,6 @@ class AutoTranslate extends Controller
             return;
         }
 
-        if (empty($selectedFields)) {
-            Flash::error('Please select at least one field to translate');
-            return;
-        }
-
         try {
             $manager = new TranslationManager();
             $translatedCount = 0;
@@ -161,7 +155,6 @@ class AutoTranslate extends Controller
                     $targetLocale,
                     $modelIds,
                     [
-                        'fields' => $selectedFields,
                         'overwrite' => $overwrite
                     ]
                 );
