@@ -1,0 +1,100 @@
+# ===================================
+#  Form Field Definitions
+# ===================================
+
+tabs:
+    fields:
+        # API Configuration Tab
+        deepl_api_key:
+            tab: API Configuration
+            label: DeepL API Key
+            type: text
+            span: left
+            required: true
+            comment: Your DeepL API authentication key. Get one at https://www.deepl.com/pro-api
+            placeholder: Enter your DeepL API key
+            
+        deepl_server_type:
+            tab: API Configuration
+            label: Server Type
+            type: dropdown
+            span: right
+            required: true
+            default: free
+            options:
+                free: Free API (api-free.deepl.com)
+                pro: Pro API (api.deepl.com)
+            comment: Select your DeepL API plan type
+            
+        # Translation Options Tab
+        default_source_locale:
+            tab: Translation Options
+            label: Default Source Language
+            type: dropdown
+            span: left
+            comment: Default language to translate from
+            placeholder: Select default source language
+            emptyOption: -- Use system default --
+            
+        preserve_html:
+            tab: Translation Options
+            label: Preserve HTML Formatting
+            type: switch
+            span: right
+            default: true
+            comment: Maintain HTML structure in rich editor content
+            
+        excluded_fields:
+            tab: Translation Options
+            label: Excluded Field Names
+            type: textarea
+            span: full
+            size: small
+            comment: Field names to exclude from translation (one per line or comma-separated). Example slug, code, api_key, secret
+            placeholder: |
+                slug
+                code
+                api_key
+                
+        batch_size:
+            tab: Advanced
+            label: Batch Translation Size
+            type: number
+            span: left
+            default: 50
+            min: 1
+            max: 100
+            comment: Number of texts to translate in one batch (1-100)
+            
+        enable_queue:
+            tab: Advanced
+            label: Use Queue for Large Jobs
+            type: switch
+            span: right
+            default: false
+            comment: Process large translation jobs in background queue (requires queue configuration)
+            
+        auto_translate_on_save:
+            tab: Advanced
+            label: Auto-translate on Save
+            type: switch
+            span: left
+            default: false
+            comment: Automatically translate content when saving models (experimental)
+            
+        log_translations:
+            tab: Advanced
+            label: Log Translation Activity
+            type: switch
+            span: right
+            default: true
+            comment: Log translation operations for debugging
+
+secondaryTabs:
+    fields:
+        usage_info:
+            tab: Usage & Info
+            type: partial
+            path: $/pensoft/autotranslation/models/settings/_usage_info.htm
+            span: full
+

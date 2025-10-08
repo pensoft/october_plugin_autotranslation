@@ -1,0 +1,290 @@
+<?= Form::open(['id' => 'translateModelsForm']) ?>
+
+<div class="scoreboard">
+    <div data-control="toolbar">
+        <div class="scoreboard-item title-value">
+            <h4>Translate Models</h4>
+            <p>Automatically translate translatable model data using DeepL AI</p>
+        </div>
+    </div>
+</div>
+
+<div class="form-preview">
+    <?php if (empty($translatableModels)): ?>
+        <div class="callout callout-warning">
+            <div class="header">
+                <i class="icon-exclamation-triangle"></i>
+                <h3>No Translatable Models Found</h3>
+            </div>
+            <div class="content">
+                <p>No models with TranslatableModel behavior were detected in your system.</p>
+                <p>To make a model translatable, add the following to your model:</p>
+                <pre>public $implement = ['@RainLab.Translate.Behaviors.TranslatableModel'];
+public $translatable = ['title', 'content', 'description'];</pre>
+            </div>
+        </div>
+    <?php else: ?>
+        <div class="form-group">
+            <label>Model Type</label>
+            <select name="model_class" id="modelClassSelect" class="form-control custom-select" required>
+                <option value="">-- Select Model Type --</option>
+                <?php foreach ($translatableModels as $class => $modelData): ?>
+                    <option value="<?= e($class) ?>"
+                            data-record-count="<?= e($modelData['recordCount']) ?>"
+                            data-fields='<?= json_encode($modelData['fields']) ?>'>
+                        <?= e($modelData['label']) ?> (<?= $modelData['recordCount'] ?> records)
+                    </option>
+                <?php endforeach ?>
+            </select>
+            <p class="help-block">
+                <i class="icon-info-circle"></i>
+                Select the type of content you want to translate
+            </p>
+        </div>
+
+        <!-- Field Selection (shown after model is selected) -->
+        <div class="form-group" id="fieldSelectionGroup" style="display: none;">
+            <label>
+                Fields to Translate
+                <small class="text-muted">Select which fields to translate</small>
+            </label>
+            <div id="fieldsList" class="fields-list">
+                <!-- Fields will be populated via JavaScript -->
+            </div>
+            <p class="help-block">
+                <i class="icon-info-circle"></i>
+                <span class="text-muted">Recommended fields are pre-selected. Slugs and codes are typically skipped.</span>
+            </p>
+        </div>
+
+        <div class="form-group">
+            <label>Source Language</label>
+            <select name="source_locale" class="form-control custom-select" required>
+                <option value="">-- Select Source Language --</option>
+                <?php foreach ($locales as $locale): ?>
+                    <option value="<?= $locale->code ?>" <?= $defaultLocale && $defaultLocale->code == $locale->code ? 'selected' : '' ?>>
+                        <?= e($locale->name) ?> (<?= $locale->code ?>)
+                    </option>
+                <?php endforeach ?>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Target Languages</label>
+            <div class="checkbox-list">
+                <?php foreach ($locales as $locale): ?>
+                    <?php if ($defaultLocale && $locale->code === $defaultLocale->code) continue; ?>
+                    <div class="checkbox">
+                        <input type="checkbox"
+                               name="target_locales[]"
+                               value="<?= $locale->code ?>"
+                               id="model_locale_<?= $locale->code ?>"
+                               class="form-check-input">
+                        <label for="model_locale_<?= $locale->code ?>" class="form-check-label">
+                            <?= e($locale->name) ?> (<?= $locale->code ?>)
+                        </label>
+                    </div>
+                <?php endforeach ?>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="checkbox">
+                <input type="checkbox" name="overwrite" id="overwrite_models" value="1">
+                <label for="overwrite_models">
+                    <strong>Overwrite existing translations</strong>
+                    <small class="text-muted d-block">If unchecked, only empty fields will be translated</small>
+                </label>
+            </div>
+        </div>
+
+        <div class="callout callout-info">
+            <div class="header">
+                <i class="icon-lightbulb-o"></i>
+                <h3>Smart Translation</h3>
+            </div>
+            <div class="content">
+                <ul>
+                    <li>Only selected fields will be translated</li>
+                    <li>HTML formatting in rich editor fields is preserved</li>
+                    <li>Empty fields are automatically skipped</li>
+                    <li>DeepL auto-detects the source language</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="form-buttons">
+            <button
+                type="button"
+                class="btn btn-primary"
+                data-request="onTranslateModels"
+                data-request-confirm="Are you sure you want to translate the selected model records? This may take some time and will consume DeepL API credits."
+                data-stripe-load-indicator>
+                <i class="icon-language"></i>
+                Translate All Records
+            </button>
+
+            <button
+                type="button"
+                class="btn btn-default"
+                data-request="onTestConnection">
+                <i class="icon-plug"></i>
+                Test API Connection
+            </button>
+        </div>
+    <?php endif ?>
+</div>
+
+<?= Form::close() ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modelSelect = document.getElementById('modelClassSelect');
+    const fieldSelectionGroup = document.getElementById('fieldSelectionGroup');
+    const fieldsList = document.getElementById('fieldsList');
+
+    if (!modelSelect) return;
+
+    modelSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+
+        if (!this.value) {
+            fieldSelectionGroup.style.display = 'none';
+            return;
+        }
+
+        try {
+            const fields = JSON.parse(selectedOption.dataset.fields || '{}');
+
+            if (Object.keys(fields).length === 0) {
+                fieldSelectionGroup.style.display = 'none';
+                return;
+            }
+
+            // Build fields checkboxes
+            let html = '<div class="checkbox-list">';
+
+            for (const [fieldName, fieldData] of Object.entries(fields)) {
+                const fieldId = 'field_' + fieldName;
+                const checked = fieldData.recommended ? 'checked' : '';
+                const typeClass = 'field-type-' + fieldData.type;
+
+                html += `
+                    <div class="checkbox ${typeClass}">
+                        <input type="checkbox"
+                               name="selected_fields[]"
+                               value="${fieldName}"
+                               id="${fieldId}"
+                               ${checked}
+                               class="form-check-input">
+                        <label for="${fieldId}" class="form-check-label">
+                            <strong>${fieldData.label}</strong>
+                            <span class="field-type-badge">${fieldData.type}</span>
+                        </label>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+
+            fieldsList.innerHTML = html;
+            fieldSelectionGroup.style.display = 'block';
+
+        } catch (e) {
+            console.error('Error parsing fields:', e);
+            fieldSelectionGroup.style.display = 'none';
+        }
+    });
+});
+</script>
+
+<style>
+    .checkbox-list {
+        max-height: 250px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 3px;
+        background: #f9f9f9;
+    }
+
+    .checkbox-list .checkbox {
+        margin: 5px 0;
+        padding: 8px;
+        border-radius: 3px;
+        transition: background-color 0.2s;
+    }
+
+    .checkbox-list .checkbox:hover {
+        background-color: #f0f0f0;
+    }
+
+    .checkbox input[type="checkbox"] {
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+
+    .checkbox label {
+        cursor: pointer;
+        font-weight: normal;
+        margin-bottom: 0;
+    }
+
+    .form-check-input {
+        position: relative;
+        margin-top: 0;
+        margin-right: 8px;
+    }
+
+    .form-check-label {
+        cursor: pointer;
+        font-weight: normal;
+    }
+
+    .field-type-badge {
+        display: inline-block;
+        padding: 2px 6px;
+        margin-left: 8px;
+        font-size: 10px;
+        background: #e0e0e0;
+        border-radius: 3px;
+        color: #666;
+        text-transform: uppercase;
+        font-weight: bold;
+    }
+
+    .field-type-richeditor .field-type-badge {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+
+    .field-type-slug .field-type-badge {
+        background: #fff3e0;
+        color: #f57c00;
+    }
+
+    .field-type-meta .field-type-badge {
+        background: #f3e5f5;
+        color: #7b1fa2;
+    }
+
+    .fields-list {
+        margin-top: 10px;
+    }
+
+    pre {
+        background: #2d2d2d;
+        color: #f8f8f2;
+        padding: 15px;
+        border-radius: 3px;
+        overflow-x: auto;
+    }
+
+    .text-muted {
+        color: #999;
+    }
+
+    .d-block {
+        display: block;
+    }
+</style>

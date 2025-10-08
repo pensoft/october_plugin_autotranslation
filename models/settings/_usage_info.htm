@@ -1,0 +1,87 @@
+<div class="callout callout-info">
+    <div class="header">
+        <i class="icon-info-circle"></i>
+        <h3>DeepL API Information</h3>
+    </div>
+    <div class="content">
+        <h4><i class="icon-key"></i> API Key Setup</h4>
+        <ol>
+            <li>Get your DeepL API key from <a href="https://www.deepl.com/pro-api" target="_blank">DeepL Pro API</a></li>
+            <li>Choose between <strong>Free</strong> or <strong>Pro</strong> plan</li>
+            <li>Enter your API key and select the server type above</li>
+            <li>Save settings</li>
+        </ol>
+        
+        <div class="callout callout-success">
+            <p><strong>Test Your Configuration:</strong></p>
+            <p>After saving your API key, go to <strong>Auto Translation → Translate Messages</strong> and click the <strong>"Test API Connection"</strong> button to verify your setup.</p>
+            <p>
+                <a href="<?= Backend::url('pensoft/autotranslation/autotranslate/messages') ?>" class="btn btn-primary">
+                    <i class="icon-arrow-right"></i> Go to Translation Page
+                </a>
+            </p>
+        </div>
+        
+        <hr>
+        
+        <h4><i class="icon-language"></i> Supported Languages</h4>
+        <p>DeepL supports translation between the following languages:</p>
+        <div style="column-count: 2; column-gap: 20px;">
+            <ul style="margin-bottom: 0;">
+                <li>Arabic (ar)</li>
+                <li>Bulgarian (bg)</li>
+                <li>Chinese (zh)</li>
+                <li>Czech (cs)</li>
+                <li>Danish (da)</li>
+                <li>Dutch (nl)</li>
+                <li>English (en)</li>
+                <li>Estonian (et)</li>
+                <li>Finnish (fi)</li>
+                <li>French (fr)</li>
+                <li>German (de)</li>
+                <li>Greek (el)</li>
+                <li>Hungarian (hu)</li>
+                <li>Indonesian (id)</li>
+                <li>Italian (it)</li>
+                <li>Japanese (ja)</li>
+                <li>Korean (ko)</li>
+                <li>Latvian (lv)</li>
+                <li>Lithuanian (lt)</li>
+                <li>Norwegian (nb)</li>
+                <li>Polish (pl)</li>
+                <li>Portuguese (pt)</li>
+                <li>Romanian (ro)</li>
+                <li>Russian (ru)</li>
+                <li>Slovak (sk)</li>
+                <li>Slovenian (sl)</li>
+                <li>Spanish (es)</li>
+                <li>Swedish (sv)</li>
+                <li>Turkish (tr)</li>
+                <li>Ukrainian (uk)</li>
+            </ul>
+        </div>
+        
+        <hr>
+        
+        <h4><i class="icon-book"></i> Resources</h4>
+        <p>
+            <a href="https://www.deepl.com/docs-api/" target="_blank" class="btn btn-default">
+                <i class="icon-external-link"></i> DeepL API Documentation
+            </a>
+            <a href="https://www.deepl.com/pro-api" target="_blank" class="btn btn-default">
+                <i class="icon-credit-card"></i> Pricing & Plans
+            </a>
+        </p>
+        
+        <div class="callout callout-warning">
+            <p><strong><i class="icon-info-circle"></i> Important Notes:</strong></p>
+            <ul>
+                <li>Free API and Pro API use different endpoints</li>
+                <li>Free API: <code>api-free.deepl.com</code> (500,000 characters/month)</li>
+                <li>Pro API: <code>api.deepl.com</code> (pay-as-you-go)</li>
+                <li>Make sure to select the correct server type matching your plan</li>
+            </ul>
+        </div>
+    </div>
+</div>
+

@@ -1,0 +1,133 @@
+<?= Form::open(['id' => 'translateMessagesForm']) ?>
+
+<div class="scoreboard">
+    <div data-control="toolbar">
+        <div class="scoreboard-item title-value">
+            <h4>Translate Messages</h4>
+            <p>Automatically translate messages using DeepL AI</p>
+        </div>
+    </div>
+</div>
+
+<div class="form-preview">
+    <div class="form-group">
+        <label>Source Language</label>
+        <select name="source_locale" class="form-control custom-select" required>
+            <option value="">-- Select Source Language --</option>
+            <?php foreach ($locales as $locale): ?>
+                <option value="<?= $locale->code ?>" <?= $defaultLocale && $defaultLocale->code == $locale->code ? 'selected' : '' ?>>
+                    <?= e($locale->name) ?> (<?= $locale->code ?>)
+                </option>
+            <?php endforeach ?>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>Target Languages</label>
+        <div class="checkbox-list">
+            <?php foreach ($locales as $locale): ?>
+                <?php if ($defaultLocale && $locale->code === $defaultLocale->code) continue; ?>
+                <div class="checkbox">
+                    <input type="checkbox" 
+                           name="target_locales[]" 
+                           value="<?= $locale->code ?>" 
+                           id="locale_<?= $locale->code ?>"
+                           class="form-check-input">
+                    <label for="locale_<?= $locale->code ?>" class="form-check-label">
+                        <?= e($locale->name) ?> (<?= $locale->code ?>)
+                    </label>
+                </div>
+            <?php endforeach ?>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <div class="checkbox">
+            <input type="checkbox" name="overwrite" value="1" id="overwrite_existing" class="form-check-input">
+            <label for="overwrite_existing" class="form-check-label">
+                Overwrite existing translations
+            </label>
+        </div>
+        <p class="help-block">
+            <i class="icon-info-circle"></i>
+            If checked, existing translations will be replaced. Otherwise, only empty translations will be filled.
+        </p>
+    </div>
+
+    <div class="form-group">
+        <label>
+            <i class="icon-bar-chart"></i> Translation Statistics
+        </label>
+        <div class="callout callout-info">
+            <p><strong>Total Messages:</strong> <?= number_format($totalMessages) ?></p>
+            <p class="text-muted">
+                <small>Select source and target languages to see detailed statistics</small>
+            </p>
+        </div>
+    </div>
+
+    <div class="form-buttons">
+        <button 
+            type="button"
+            class="btn btn-primary"
+            data-request="onTranslateMessages"
+            data-request-confirm="Are you sure you want to translate the messages? This may take some time and will consume DeepL API credits."
+            data-stripe-load-indicator>
+            <i class="icon-language"></i>
+            Translate All Messages
+        </button>
+        
+        <button 
+            type="button"
+            class="btn btn-default"
+            data-request="onCheckUsage">
+            <i class="icon-info-circle"></i>
+            Check API Usage
+        </button>
+        
+        <a href="<?= Backend::url('rainlab/translate/messages') ?>" class="btn btn-default">
+            <i class="icon-list-alt"></i>
+            View Messages
+        </a>
+    </div>
+</div>
+
+<?= Form::close() ?>
+
+<style>
+    .checkbox-list {
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 3px;
+        background: #f9f9f9;
+    }
+    
+    .checkbox-list .checkbox {
+        margin: 5px 0;
+    }
+    
+    .checkbox input[type="checkbox"] {
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+    
+    .checkbox label {
+        cursor: pointer;
+        font-weight: normal;
+        margin-bottom: 0;
+    }
+    
+    .form-check-input {
+        position: relative;
+        margin-top: 0;
+        margin-right: 8px;
+    }
+    
+    .form-check-label {
+        cursor: pointer;
+        font-weight: normal;
+    }
+</style>
+
