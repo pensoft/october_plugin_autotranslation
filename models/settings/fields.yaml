@@ -32,9 +32,9 @@ tabs:
             label: Default Source Language
             type: dropdown
             span: left
-            comment: Default language to translate from
-            placeholder: Select default source language
-            emptyOption: -- Use system default --
+            required: true
+            comment: The language to translate FROM. All translation operations will use this as the source language.
+            placeholder: Select source language
             
         preserve_html:
             tab: Translation Options

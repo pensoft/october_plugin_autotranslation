@@ -46,6 +46,27 @@ class AutoTranslate extends Controller
 
         return $this->translationManager;
     }
+
+    /**
+     * Get configured source locale from settings
+     *
+     * @return Locale
+     */
+    protected function getConfiguredSourceLocale()
+    {
+        $settings = \Pensoft\AutoTranslation\Models\Settings::instance();
+        $sourceLocaleCode = $settings->get('default_source_locale');
+
+        if ($sourceLocaleCode) {
+            $locale = Locale::where('code', $sourceLocaleCode)->first();
+            if ($locale) {
+                return $locale;
+            }
+        }
+
+        // Fall back to system default locale
+        return Locale::getDefault();
+    }
     
     /**
      * Messages translation page
@@ -53,9 +74,10 @@ class AutoTranslate extends Controller
     public function messages()
     {
         $this->pageTitle = 'Translate Messages';
-        
+
         $this->vars['locales'] = Locale::isEnabled()->get();
         $this->vars['defaultLocale'] = Locale::getDefault();
+        $this->vars['sourceLocale'] = $this->getConfiguredSourceLocale();
         $this->vars['messages'] = Message::paginate(50);
         $this->vars['totalMessages'] = Message::count();
     }
@@ -66,10 +88,11 @@ class AutoTranslate extends Controller
     public function models()
     {
         $this->pageTitle = 'Translate Models';
-        
+
         $this->vars['locales'] = Locale::isEnabled()->get();
         $this->vars['defaultLocale'] = Locale::getDefault();
-        
+        $this->vars['sourceLocale'] = $this->getConfiguredSourceLocale();
+
         // Get translatable models from the system
         $this->vars['translatableModels'] = $this->getTranslatableModels();
     }
@@ -100,8 +123,10 @@ class AutoTranslate extends Controller
      */
     protected function getMessageTranslationData()
     {
+        $sourceLocale = $this->getConfiguredSourceLocale();
+
         return [
-            'sourceLocale' => post('source_locale'),
+            'sourceLocale' => $sourceLocale->code,
             'targetLocales' => post('target_locales', []),
             'messageIds' => post('message_ids', []),
             'overwrite' => (bool) post('overwrite', false)
@@ -116,11 +141,6 @@ class AutoTranslate extends Controller
      */
     protected function validateMessageTranslationData(array $data)
     {
-        if (empty($data['sourceLocale'])) {
-            Flash::error('Please select a source language');
-            return false;
-        }
-
         if (empty($data['targetLocales'])) {
             Flash::error('Please select at least one target language');
             return false;
@@ -212,9 +232,11 @@ class AutoTranslate extends Controller
      */
     protected function getModelTranslationData()
     {
+        $sourceLocale = $this->getConfiguredSourceLocale();
+
         return [
             'modelClass' => post('model_class'),
-            'sourceLocale' => post('source_locale'),
+            'sourceLocale' => $sourceLocale->code,
             'targetLocales' => post('target_locales', []),
             'modelIds' => post('model_ids', []),
             'overwrite' => (bool) post('overwrite', false)
@@ -236,11 +258,6 @@ class AutoTranslate extends Controller
 
         if (!class_exists($data['modelClass'])) {
             Flash::error('Invalid model class');
-            return false;
-        }
-
-        if (empty($data['sourceLocale'])) {
-            Flash::error('Please select a source language');
             return false;
         }
 

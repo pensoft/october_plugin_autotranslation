@@ -24,6 +24,27 @@ public $translatable = ['title', 'content', 'description'];</pre>
             </div>
         </div>
     <?php else: ?>
+        <div class="callout callout-info">
+            <div class="header">
+                <i class="icon-language"></i>
+                <h4>Translation Source</h4>
+            </div>
+            <div class="content">
+                <p>
+                    <strong>Source Language:</strong> <?= e($sourceLocale->name) ?> (<?= $sourceLocale->code ?>)
+                </p>
+                <p class="text-muted">
+                    <small>
+                        <i class="icon-cog"></i>
+                        To change the source language, go to
+                        <a href="<?= Backend::url('system/settings/update/pensoft/autotranslation/settings') ?>">
+                            Settings &rsaquo; Auto Translation
+                        </a>
+                    </small>
+                </p>
+            </div>
+        </div>
+
         <div class="form-group">
             <label>Model Type</label>
             <select name="model_class" id="modelClassSelect" class="form-control custom-select" required>
@@ -38,18 +59,6 @@ public $translatable = ['title', 'content', 'description'];</pre>
                 <i class="icon-info-circle"></i>
                 All translatable fields will be automatically translated (excluding fields configured in settings)
             </p>
-        </div>
-
-        <div class="form-group">
-            <label>Source Language</label>
-            <select name="source_locale" class="form-control custom-select" required>
-                <option value="">-- Select Source Language --</option>
-                <?php foreach ($locales as $locale): ?>
-                    <option value="<?= $locale->code ?>" <?= $defaultLocale && $defaultLocale->code == $locale->code ? 'selected' : '' ?>>
-                        <?= e($locale->name) ?> (<?= $locale->code ?>)
-                    </option>
-                <?php endforeach ?>
-            </select>
         </div>
 
         <div class="form-group">
