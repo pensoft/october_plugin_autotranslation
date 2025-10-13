@@ -55,40 +55,6 @@ tabs:
                 slug
                 code
                 api_key
-                
-        batch_size:
-            tab: Advanced
-            label: Batch Translation Size
-            type: number
-            span: left
-            default: 50
-            min: 1
-            max: 100
-            comment: Number of texts to translate in one batch (1-100)
-            
-        enable_queue:
-            tab: Advanced
-            label: Use Queue for Large Jobs
-            type: switch
-            span: right
-            default: false
-            comment: Process large translation jobs in background queue (requires queue configuration)
-            
-        auto_translate_on_save:
-            tab: Advanced
-            label: Auto-translate on Save
-            type: switch
-            span: left
-            default: false
-            comment: Automatically translate content when saving models (experimental)
-            
-        log_translations:
-            tab: Advanced
-            label: Log Translation Activity
-            type: switch
-            span: right
-            default: true
-            comment: Log translation operations for debugging
 
 secondaryTabs:
     fields:

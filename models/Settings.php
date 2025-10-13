@@ -43,7 +43,7 @@ class Settings extends Model
     {
         return Locale::listEnabled();
     }
-    
+
     /**
      * Get default source locale options
      *
@@ -53,6 +53,6 @@ class Settings extends Model
     {
         return Locale::listEnabled();
     }
-    
+
 }
 

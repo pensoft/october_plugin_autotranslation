@@ -84,8 +84,8 @@ class TranslationManager
                 // Translate the value
                 $translatedValue = $this->translator->translateText(
                     $sourceValue,
-                    $this->normalizeLocaleForDeepL($sourceLocale),
-                    $this->normalizeLocaleForDeepL($targetLocale),
+                    $sourceLocale,
+                    $targetLocale,
                     $options
                 );
 
@@ -127,14 +127,13 @@ class TranslationManager
     {
         // Check if target language is supported by DeepL
         $availableLanguages = $this->translator->getTargetLanguages();
-        $normalizedTarget = $this->normalizeLocaleForDeepL($targetLocale);
 
-        if (!isset($availableLanguages[$normalizedTarget])) {
-            \Log::warning("Target language '{$targetLocale}' (normalized to '{$normalizedTarget}') is not supported by DeepL", [
+        if (!isset($availableLanguages[$targetLocale])) {
+            \Log::warning("Target language '{$targetLocale}' is not supported by DeepL", [
                 'available_languages' => array_keys($availableLanguages)
             ]);
 
-            throw new \Exception("Language '{$targetLocale}' (code: {$normalizedTarget}) is not supported by your DeepL account. All available languages: " . implode(', ', array_keys($availableLanguages)));
+            throw new \Exception("Language '{$targetLocale}' is not supported by your DeepL account. Available languages: " . implode(', ', array_keys($availableLanguages)) . ". Please ensure your locale code matches DeepL's format (e.g., EN-US, BG, PT-BR).");
         }
 
         $query = Message::query();
@@ -183,18 +182,12 @@ class TranslationManager
             }
 
             try {
-                $normalizedSource = $this->normalizeLocaleForDeepL($sourceLocale);
-                $normalizedTarget = $this->normalizeLocaleForDeepL($targetLocale);
-
-                \Log::info("Message ID {$message->id} - TRANSLATING from {$sourceLocale} to {$targetLocale}", [
-                    'normalized_source' => $normalizedSource,
-                    'normalized_target' => $normalizedTarget
-                ]);
+                \Log::info("Message ID {$message->id} - TRANSLATING from {$sourceLocale} to {$targetLocale}");
 
                 $translatedText = $this->translator->translateText(
                     $sourceText,
-                    $normalizedSource,
-                    $normalizedTarget
+                    $sourceLocale,
+                    $targetLocale
                 );
 
                 \Log::info("Message ID {$message->id} - Translation result: " . substr($translatedText, 0, 50));
@@ -280,72 +273,6 @@ class TranslationManager
         }
 
         return [];
-    }
-    
-    /**
-     * Normalize locale code for DeepL API
-     * DeepL uses uppercase codes like 'EN-US', 'PT-PT', 'HR', etc.
-     *
-     * @param string $locale
-     * @return string
-     */
-    protected function normalizeLocaleForDeepL($locale)
-    {
-        // Mapping of locale codes to DeepL format (all EU languages + common others)
-        $mapping = [
-            // English variants
-            'en' => 'EN-US',
-            'en-gb' => 'EN-GB',
-            'en-us' => 'EN-US',
-
-            // Portuguese variants
-            'pt' => 'PT-PT',
-            'pt-pt' => 'PT-PT',
-            'pt-br' => 'PT-BR',
-
-            // EU Languages
-            'bg' => 'BG',      // Bulgarian
-            'cs' => 'CS',      // Czech
-            'da' => 'DA',      // Danish
-            'de' => 'DE',      // German
-            'el' => 'EL',      // Greek
-            'es' => 'ES',      // Spanish
-            'et' => 'ET',      // Estonian
-            'fi' => 'FI',      // Finnish
-            'fr' => 'FR',      // French
-            'hu' => 'HU',      // Hungarian
-            'id' => 'ID',      // Indonesian
-            'it' => 'IT',      // Italian
-            'ja' => 'JA',      // Japanese
-            'ko' => 'KO',      // Korean
-            'lt' => 'LT',      // Lithuanian
-            'lv' => 'LV',      // Latvian
-            'nb' => 'NB',      // Norwegian (Bokmål)
-            'nl' => 'NL',      // Dutch
-            'pl' => 'PL',      // Polish
-            'ro' => 'RO',      // Romanian
-            'ru' => 'RU',      // Russian
-            'sk' => 'SK',      // Slovak
-            'sl' => 'SL',      // Slovenian
-            'sv' => 'SV',      // Swedish
-            'tr' => 'TR',      // Turkish
-            'uk' => 'UK',      // Ukrainian
-            'zh' => 'ZH',      // Chinese (simplified)
-            'hr' => 'HR',      // Croatian
-            'ga' => 'GA',      // Irish (not in DeepL - will fallback)
-            'mt' => 'MT',      // Maltese (not in DeepL - will fallback)
-        ];
-
-        // Convert to lowercase for comparison
-        $localeLower = strtolower($locale);
-
-        // Check if we have a mapping
-        if (isset($mapping[$localeLower])) {
-            return $mapping[$localeLower];
-        }
-
-        // Default: convert to uppercase (DeepL uses uppercase 2-letter codes)
-        return strtoupper(substr($locale, 0, 2));
     }
     
     /**
