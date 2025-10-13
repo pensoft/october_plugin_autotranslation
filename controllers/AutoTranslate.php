@@ -30,7 +30,8 @@ class AutoTranslate extends Controller
     {
         parent::__construct();
 
-        BackendMenu::setContext('Pensoft.AutoTranslation', 'autotranslation', 'messages');
+        // Default context - will be overridden by individual page methods
+        BackendMenu::setContext('Pensoft.AutoTranslation', 'autotranslation');
     }
 
     /**
@@ -74,6 +75,7 @@ class AutoTranslate extends Controller
     public function messages()
     {
         $this->pageTitle = 'Translate Messages';
+        BackendMenu::setContext('Pensoft.AutoTranslation', 'autotranslation', 'messages');
 
         $this->vars['locales'] = Locale::isEnabled()->get();
         $this->vars['defaultLocale'] = Locale::getDefault();
@@ -88,6 +90,7 @@ class AutoTranslate extends Controller
     public function models()
     {
         $this->pageTitle = 'Translate Models';
+        BackendMenu::setContext('Pensoft.AutoTranslation', 'autotranslation', 'models');
 
         $this->vars['locales'] = Locale::isEnabled()->get();
         $this->vars['defaultLocale'] = Locale::getDefault();
