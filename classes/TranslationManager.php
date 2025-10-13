@@ -53,9 +53,20 @@ class TranslationManager
         $attributes = $this->prepareAttributesForTranslation($model, $options);
         $overwrite = $options['overwrite'] ?? false;
 
-        $translated = $this->translateAttributes($model, $attributes, $normalizedSource, $normalizedTarget, $overwrite, $options);
+        // Pass both original and normalized locale codes
+        $translated = $this->translateAttributes(
+            $model,
+            $attributes,
+            $sourceLocale,      // Original for storage
+            $targetLocale,      // Original for storage
+            $normalizedSource,  // Normalized for DeepL API
+            $normalizedTarget,  // Normalized for DeepL API
+            $overwrite,
+            $options
+        );
 
         if (!empty($translated)) {
+            // Use original locale code for storage
             $this->saveTranslatedModel($model, $translated, $targetLocale);
         }
 
@@ -100,19 +111,32 @@ class TranslationManager
      *
      * @param Model $model
      * @param array $attributes
-     * @param string $sourceLocale
-     * @param string $targetLocale
+     * @param string $sourceLocale Original locale code for storage
+     * @param string $targetLocale Original locale code for storage
+     * @param string $normalizedSource Normalized locale code for DeepL API
+     * @param string $normalizedTarget Normalized locale code for DeepL API
      * @param bool $overwrite
      * @param array $options
      * @return array
      */
-    protected function translateAttributes(Model $model, array $attributes, $sourceLocale, $targetLocale, $overwrite, array $options)
+    protected function translateAttributes(Model $model, array $attributes, $sourceLocale, $targetLocale, $normalizedSource, $normalizedTarget, $overwrite, array $options)
     {
         $translated = [];
+        // Use original locale code for model context
         $model->translateContext($sourceLocale);
 
         foreach ($attributes as $attribute) {
-            $result = $this->translateAttribute($model, $attribute, $sourceLocale, $targetLocale, $overwrite, $options);
+            // Pass both original and normalized codes
+            $result = $this->translateAttribute(
+                $model,
+                $attribute,
+                $sourceLocale,      // Original for storage
+                $targetLocale,      // Original for storage
+                $normalizedSource,  // Normalized for DeepL API
+                $normalizedTarget,  // Normalized for DeepL API
+                $overwrite,
+                $options
+            );
 
             if ($result !== null) {
                 $translated[$attribute] = $result;
@@ -127,13 +151,15 @@ class TranslationManager
      *
      * @param Model $model
      * @param string $attribute
-     * @param string $sourceLocale
-     * @param string $targetLocale
+     * @param string $sourceLocale Original locale code for storage
+     * @param string $targetLocale Original locale code for storage
+     * @param string $normalizedSource Normalized locale code for DeepL API
+     * @param string $normalizedTarget Normalized locale code for DeepL API
      * @param bool $overwrite
      * @param array $options
      * @return string|null
      */
-    protected function translateAttribute(Model $model, $attribute, $sourceLocale, $targetLocale, $overwrite, array $options)
+    protected function translateAttribute(Model $model, $attribute, $sourceLocale, $targetLocale, $normalizedSource, $normalizedTarget, $overwrite, array $options)
     {
         $sourceValue = $model->getAttribute($attribute);
 
@@ -142,13 +168,14 @@ class TranslationManager
             return null;
         }
 
+        // Check using original locale code (for October CMS storage)
         if ($this->shouldSkipTranslation($model, $attribute, $targetLocale, $overwrite)) {
-            $model->translateContext($sourceLocale);
             return null;
         }
 
         try {
-            $translatedValue = $this->translator->translateText($sourceValue, $sourceLocale, $targetLocale, $options);
+            // Use normalized codes for DeepL API
+            $translatedValue = $this->translator->translateText($sourceValue, $normalizedSource, $normalizedTarget, $options);
             $this->logSuccessfulTranslation($model, $attribute, $sourceLocale, $targetLocale);
             return $translatedValue;
         } catch (\Exception $e) {
@@ -179,10 +206,10 @@ class TranslationManager
      */
     protected function shouldSkipTranslation(Model $model, $attribute, $targetLocale, $overwrite)
     {
-        $model->translateContext($targetLocale);
-        $existingTranslation = $model->getAttribute($attribute);
+        // Check if translation actually exists in database (not fallback)
+        $hasTranslation = $this->modelHasTranslation($model, $attribute, $targetLocale);
 
-        if (!empty($existingTranslation) && !$overwrite) {
+        if ($hasTranslation && !$overwrite) {
             $this->logSkippedTranslation($model, $attribute);
             return true;
         }
@@ -191,23 +218,71 @@ class TranslationManager
     }
 
     /**
+     * Check if model has translation for attribute in target locale
+     *
+     * @param Model $model
+     * @param string $attribute
+     * @param string $targetLocale
+     * @return bool
+     */
+    protected function modelHasTranslation(Model $model, $attribute, $targetLocale)
+    {
+        // Get the default locale to check if we're asking about source content
+        $defaultLocale = $this->getDefaultLocale();
+
+        // If checking the default locale, translations always "exist" (it's the source)
+        if ($targetLocale === $defaultLocale) {
+            return !$this->isEmptyValue($model->getAttribute($attribute));
+        }
+
+        // Store the current fallback state and context to restore later
+        $originalContext = $model->translateContext();
+        $wasUsingFallback = property_exists($model, 'translatableUseFallback')
+            ? $model->translatableUseFallback
+            : true;
+
+        // Disable fallback temporarily to get accurate translation status
+        // When fallback is disabled, getAttribute() returns:
+        // - The actual translated value if it exists
+        // - Empty string if no translation exists (instead of falling back to default)
+        $model->noFallbackLocale()->translateContext($targetLocale);
+        $translatedValue = $model->getAttribute($attribute);
+
+        // Restore original state
+        if ($wasUsingFallback) {
+            $model->withFallbackLocale();
+        }
+        $model->translateContext($originalContext);
+
+        // If we got a non-empty value, a translation exists
+        // If we got an empty value, no translation exists
+        return !$this->isEmptyValue($translatedValue);
+    }
+
+    /**
      * Save translated model
      *
      * @param Model $model
      * @param array $translated
-     * @param string $targetLocale
+     * @param string $targetLocale Original locale code for storage
      * @return void
      */
     protected function saveTranslatedModel(Model $model, array $translated, $targetLocale)
     {
-        $model->translateContext($targetLocale);
+        // Store original context to restore later
+        $originalContext = $model->translateContext();
 
+        // Use the proper RainLab.Translate API to set translated attributes
+        // Pass the explicit target locale to setAttributeTranslated to ensure proper storage
         foreach ($translated as $attribute => $value) {
-            $model->setAttribute($attribute, $value);
+            $model->setAttributeTranslated($attribute, $value, $targetLocale);
         }
 
+        // Save triggers syncTranslatableAttributes() which persists to rainlab_translate_attributes
         $model->save();
-        $model->noFallbackLocale();
+
+        // Restore original context
+        $model->translateContext($originalContext);
     }
 
     /**
@@ -273,6 +348,7 @@ class TranslationManager
      */
     public function translateMessages($sourceLocale, $targetLocale, array $messageIds = [], $overwrite = false)
     {
+        // Normalize locale codes for DeepL API
         $normalizedTarget = $this->normalizeLocaleCode($targetLocale);
         $normalizedSource = $this->normalizeLocaleCode($sourceLocale);
 
@@ -284,7 +360,16 @@ class TranslationManager
         $this->logTranslationStart($messages, $sourceLocale, $targetLocale, $overwrite);
 
         foreach ($messages as $message) {
-            $this->processMessage($message, $normalizedSource, $normalizedTarget, $overwrite, $stats);
+            // Pass both original (for storage) and normalized (for DeepL) codes
+            $this->processMessage(
+                $message,
+                $sourceLocale,      // Original for storage
+                $targetLocale,      // Original for storage
+                $normalizedSource,  // Normalized for DeepL API
+                $normalizedTarget,  // Normalized for DeepL API
+                $overwrite,
+                $stats
+            );
         }
 
         $this->logTranslationComplete($stats);
@@ -301,17 +386,24 @@ class TranslationManager
      */
     protected function normalizeLocaleCode($localeCode)
     {
-        // Convert to uppercase
-        $normalized = strtoupper($localeCode);
+        // Convert to lowercase first to handle the mapping
+        $lower = strtolower($localeCode);
 
-        // Handle common variations
-        $mapping = [
-            'EN' => 'EN-US',  // Default English to US
-            'PT' => 'PT-PT',  // Default Portuguese to Portugal
-            'ZH' => 'ZH-HANS' // Default Chinese to Simplified
-        ];
+        // Load mappings from config file
+        $mapping = $this->getLocaleMappings();
 
-        return $mapping[$normalized] ?? $normalized;
+        // Return mapped value if exists, otherwise uppercase the original
+        return $mapping[$lower] ?? strtoupper($localeCode);
+    }
+
+    /**
+     * Get locale mappings from config
+     *
+     * @return array
+     */
+    protected function getLocaleMappings()
+    {
+        return \Config::get('pensoft.autotranslation::locale_mappings', []);
     }
 
     /**
@@ -352,13 +444,15 @@ class TranslationManager
      * Process a single message
      *
      * @param Message $message
-     * @param string $sourceLocale
-     * @param string $targetLocale
+     * @param string $sourceLocale Original locale code for storage
+     * @param string $targetLocale Original locale code for storage
+     * @param string $normalizedSource Normalized locale code for DeepL API
+     * @param string $normalizedTarget Normalized locale code for DeepL API
      * @param bool $overwrite
      * @param array &$stats
      * @return void
      */
-    protected function processMessage(Message $message, $sourceLocale, $targetLocale, $overwrite, array &$stats)
+    protected function processMessage(Message $message, $sourceLocale, $targetLocale, $normalizedSource, $normalizedTarget, $overwrite, array &$stats)
     {
         $sourceText = $this->getMessageSourceText($message, $sourceLocale);
 
@@ -368,12 +462,14 @@ class TranslationManager
             return;
         }
 
+        // Check using original locale code (for October CMS storage)
         if ($this->shouldSkipMessage($message, $targetLocale, $overwrite)) {
             $stats['skipped']['already_translated']++;
             return;
         }
 
-        $this->translateAndSaveMessage($message, $sourceText, $sourceLocale, $targetLocale, $stats);
+        // Pass both original and normalized codes
+        $this->translateAndSaveMessage($message, $sourceText, $normalizedSource, $normalizedTarget, $targetLocale, $stats);
     }
 
     /**
@@ -427,9 +523,12 @@ class TranslationManager
      */
     protected function shouldSkipMessage(Message $message, $targetLocale, $overwrite)
     {
-        $existingTranslation = $message->forLocale($targetLocale);
+        // Check if translation actually exists in the target locale
+        // Don't use forLocale() as it returns fallback text if translation doesn't exist
+        $hasTranslation = $this->messageHasTranslation($message, $targetLocale);
 
-        if (!empty($existingTranslation) && !$overwrite) {
+        if ($hasTranslation && !$overwrite) {
+            $existingTranslation = $message->forLocale($targetLocale);
             $this->logSkippedMessage($message, $existingTranslation);
             return true;
         }
@@ -438,25 +537,51 @@ class TranslationManager
     }
 
     /**
+     * Check if message has translation in target locale
+     *
+     * @param Message $message
+     * @param string $targetLocale
+     * @return bool
+     */
+    protected function messageHasTranslation(Message $message, $targetLocale)
+    {
+        // Get the raw message_data JSON array
+        // This contains the actual translations without fallback logic
+        $messageData = $message->message_data ?? [];
+
+        if (!is_array($messageData)) {
+            return false;
+        }
+
+        // Check if the target locale key exists in the array AND has a non-empty value
+        // This is a direct check - no fallback to default locale
+        // Returns true only if translation explicitly exists in the database
+        return isset($messageData[$targetLocale]) && !empty($messageData[$targetLocale]);
+    }
+
+    /**
      * Translate and save message
      *
      * @param Message $message
      * @param string $sourceText
-     * @param string $sourceLocale
-     * @param string $targetLocale
+     * @param string $normalizedSource Normalized locale code for DeepL API
+     * @param string $normalizedTarget Normalized locale code for DeepL API
+     * @param string $originalTarget Original locale code for storage
      * @param array &$stats
      * @return void
      */
-    protected function translateAndSaveMessage(Message $message, $sourceText, $sourceLocale, $targetLocale, array &$stats)
+    protected function translateAndSaveMessage(Message $message, $sourceText, $normalizedSource, $normalizedTarget, $originalTarget, array &$stats)
     {
         try {
-            $this->logMessageTranslationStart($message, $sourceLocale, $targetLocale);
+            $this->logMessageTranslationStart($message, $normalizedSource, $normalizedTarget);
 
-            $translatedText = $this->translator->translateText($sourceText, $sourceLocale, $targetLocale);
+            // Use normalized codes for DeepL API
+            $translatedText = $this->translator->translateText($sourceText, $normalizedSource, $normalizedTarget);
 
             $this->logMessageTranslationResult($message, $translatedText);
 
-            $message->toLocale($targetLocale, $translatedText);
+            // Use original code for October CMS storage
+            $message->toLocale($originalTarget, $translatedText);
             $stats['count']++;
         } catch (\Exception $e) {
             \Log::error("Failed to translate message ID {$message->id}: " . $e->getMessage());
