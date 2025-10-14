@@ -8,11 +8,16 @@ use Pensoft\AutoTranslation\Models\Settings;
 class FieldFilter
 {
     /**
+     * @var Settings
+     */
+    protected $settings;
+
+    /**
      * Default field types to exclude from translation
      *
      * @var array
      */
-    protected static $excludedTypes = [
+    protected $excludedTypes = [
         'dropdown',
         'radio',
         'checkbox',
@@ -28,13 +33,13 @@ class FieldFilter
         'repeater',
         'partial',
     ];
-    
+
     /**
      * Field name patterns to exclude (regex patterns)
      *
      * @var array
      */
-    protected static $excludedPatterns = [
+    protected $excludedPatterns = [
         '/slug$/i',
         '/url$/i',
         '/uri$/i',
@@ -52,13 +57,13 @@ class FieldFilter
         '/^order$/i',
         '/^position$/i',
     ];
-    
+
     /**
      * Translatable field types
      *
      * @var array
      */
-    protected static $translatableTypes = [
+    protected $translatableTypes = [
         'text',
         'textarea',
         'richeditor',
@@ -68,6 +73,16 @@ class FieldFilter
         'mlricheditor',
         'mlmarkdowneditor',
     ];
+
+    /**
+     * Constructor
+     *
+     * @param Settings|null $settings
+     */
+    public function __construct(?Settings $settings = null)
+    {
+        $this->settings = $settings;
+    }
     
     /**
      * Check if field should be translated
@@ -76,41 +91,89 @@ class FieldFilter
      * @param array $fieldConfig
      * @return bool
      */
-    public static function shouldTranslate($fieldName, array $fieldConfig = [])
+    public function shouldTranslate($fieldName, array $fieldConfig = [])
     {
-        // Check if explicitly marked as non-translatable
-        if (isset($fieldConfig['translatable']) && $fieldConfig['translatable'] === false) {
+        if ($this->hasExplicitTranslatableFlag($fieldConfig)) {
+            return $fieldConfig['translatable'];
+        }
+
+        if ($this->matchesExcludedPattern($fieldName)) {
             return false;
         }
-        
-        // Check if explicitly marked as translatable
-        if (isset($fieldConfig['translatable']) && $fieldConfig['translatable'] === true) {
-            return true;
+
+        if ($this->isCustomExcluded($fieldName)) {
+            return false;
         }
-        
-        // Check against excluded patterns
-        foreach (self::$excludedPatterns as $pattern) {
+
+        $fieldType = $this->getFieldType($fieldConfig);
+
+        return $this->isTranslatableType($fieldType);
+    }
+
+    /**
+     * Check if field config has explicit translatable flag
+     *
+     * @param array $fieldConfig
+     * @return bool
+     */
+    protected function hasExplicitTranslatableFlag(array $fieldConfig)
+    {
+        return isset($fieldConfig['translatable']) && is_bool($fieldConfig['translatable']);
+    }
+
+    /**
+     * Check if field name matches excluded patterns
+     *
+     * @param string $fieldName
+     * @return bool
+     */
+    protected function matchesExcludedPattern($fieldName)
+    {
+        foreach ($this->excludedPatterns as $pattern) {
             if (preg_match($pattern, $fieldName)) {
-                return false;
+                return true;
             }
         }
-        
-        // Check custom excluded fields from settings
-        $customExclusions = self::getCustomExclusions();
-        if (in_array($fieldName, $customExclusions)) {
+
+        return false;
+    }
+
+    /**
+     * Check if field is in custom exclusions list
+     *
+     * @param string $fieldName
+     * @return bool
+     */
+    protected function isCustomExcluded($fieldName)
+    {
+        $customExclusions = $this->getCustomExclusions();
+        return in_array($fieldName, $customExclusions);
+    }
+
+    /**
+     * Get field type from config
+     *
+     * @param array $fieldConfig
+     * @return string
+     */
+    protected function getFieldType(array $fieldConfig)
+    {
+        return $fieldConfig['type'] ?? 'text';
+    }
+
+    /**
+     * Check if field type is translatable
+     *
+     * @param string $fieldType
+     * @return bool
+     */
+    protected function isTranslatableType($fieldType)
+    {
+        if (in_array($fieldType, $this->excludedTypes)) {
             return false;
         }
-        
-        // Get field type
-        $fieldType = isset($fieldConfig['type']) ? $fieldConfig['type'] : 'text';
-        
-        // Check if type is in excluded list
-        if (in_array($fieldType, self::$excludedTypes)) {
-            return false;
-        }
-        
-        // Only translate text-based fields
-        return in_array($fieldType, self::$translatableTypes);
+
+        return in_array($fieldType, $this->translatableTypes);
     }
     
     /**
@@ -119,66 +182,80 @@ class FieldFilter
      * @param array $fieldConfig
      * @return bool
      */
-    public static function isRichContent(array $fieldConfig = [])
+    public function isRichContent(array $fieldConfig = [])
     {
-        $fieldType = isset($fieldConfig['type']) ? $fieldConfig['type'] : 'text';
-        
-        $richTypes = [
-            'richeditor',
-            'mlricheditor',
-            'markdown',
-            'mlmarkdowneditor',
-        ];
-        
+        $fieldType = $this->getFieldType($fieldConfig);
+        return $this->isRichContentType($fieldType);
+    }
+
+    /**
+     * Check if field type is rich content type
+     *
+     * @param string $fieldType
+     * @return bool
+     */
+    protected function isRichContentType($fieldType)
+    {
+        $richTypes = ['richeditor', 'mlricheditor', 'markdown', 'mlmarkdowneditor'];
         return in_array($fieldType, $richTypes);
     }
-    
+
     /**
      * Get custom excluded fields from settings
      *
      * @return array
      */
-    public static function getCustomExclusions()
+    public function getCustomExclusions()
     {
-        $excluded = Settings::get('excluded_fields', '');
-        
+        if (!$this->settings) {
+            return [];
+        }
+
+        $excluded = $this->settings->get('excluded_fields', '');
+
         if (empty($excluded)) {
             return [];
         }
-        
-        // Support comma-separated or line-separated values
-        $fields = preg_split('/[\r\n,]+/', $excluded);
-        
-        // Trim and filter
-        $fields = array_map('trim', $fields);
-        $fields = array_filter($fields);
-        
-        return $fields;
+
+        return $this->parseExclusionsList($excluded);
     }
-    
+
+    /**
+     * Parse exclusions list from string
+     *
+     * @param string $excluded
+     * @return array
+     */
+    protected function parseExclusionsList($excluded)
+    {
+        $fields = preg_split('/[\r\n,]+/', $excluded);
+        $fields = array_map('trim', $fields);
+        return array_filter($fields);
+    }
+
     /**
      * Add custom exclusion pattern
      *
      * @param string $pattern
      * @return void
      */
-    public static function addExclusionPattern($pattern)
+    public function addExclusionPattern($pattern)
     {
-        if (!in_array($pattern, self::$excludedPatterns)) {
-            self::$excludedPatterns[] = $pattern;
+        if (!in_array($pattern, $this->excludedPatterns)) {
+            $this->excludedPatterns[] = $pattern;
         }
     }
-    
+
     /**
      * Add custom translatable type
      *
      * @param string $type
      * @return void
      */
-    public static function addTranslatableType($type)
+    public function addTranslatableType($type)
     {
-        if (!in_array($type, self::$translatableTypes)) {
-            self::$translatableTypes[] = $type;
+        if (!in_array($type, $this->translatableTypes)) {
+            $this->translatableTypes[] = $type;
         }
     }
 }

@@ -4,11 +4,9 @@ use Backend\Classes\Controller;
 use BackendMenu;
 use Pensoft\AutoTranslation\Classes\TranslationManager;
 use Pensoft\AutoTranslation\Classes\DeepLTranslator;
-use Pensoft\AutoTranslation\Models\Settings;
 use RainLab\Translate\Models\Locale;
 use RainLab\Translate\Models\Message;
 use Flash;
-use Lang;
 
 /**
  * Auto Translate Backend Controller
@@ -21,13 +19,54 @@ class AutoTranslate extends Controller
     public $requiredPermissions = ['pensoft.autotranslation.access'];
 
     /**
+     * @var TranslationManager
+     */
+    protected $translationManager;
+
+    /**
      * Constructor
      */
     public function __construct()
     {
         parent::__construct();
-        
-        BackendMenu::setContext('Pensoft.AutoTranslation', 'autotranslation', 'messages');
+
+        // Default context - will be overridden by individual page methods
+        BackendMenu::setContext('Pensoft.AutoTranslation', 'autotranslation');
+    }
+
+    /**
+     * Get or create translation manager instance
+     *
+     * @return TranslationManager
+     */
+    protected function getTranslationManager()
+    {
+        if (!$this->translationManager) {
+            $this->translationManager = new TranslationManager();
+        }
+
+        return $this->translationManager;
+    }
+
+    /**
+     * Get configured source locale from settings
+     *
+     * @return Locale
+     */
+    protected function getConfiguredSourceLocale()
+    {
+        $settings = \Pensoft\AutoTranslation\Models\Settings::instance();
+        $sourceLocaleCode = $settings->get('default_source_locale');
+
+        if ($sourceLocaleCode) {
+            $locale = Locale::where('code', $sourceLocaleCode)->first();
+            if ($locale) {
+                return $locale;
+            }
+        }
+
+        // Fall back to system default locale
+        return Locale::getDefault();
     }
     
     /**
@@ -36,9 +75,11 @@ class AutoTranslate extends Controller
     public function messages()
     {
         $this->pageTitle = 'Translate Messages';
-        
+        BackendMenu::setContext('Pensoft.AutoTranslation', 'autotranslation', 'messages');
+
         $this->vars['locales'] = Locale::isEnabled()->get();
         $this->vars['defaultLocale'] = Locale::getDefault();
+        $this->vars['sourceLocale'] = $this->getConfiguredSourceLocale();
         $this->vars['messages'] = Message::paginate(50);
         $this->vars['totalMessages'] = Message::count();
     }
@@ -49,10 +90,12 @@ class AutoTranslate extends Controller
     public function models()
     {
         $this->pageTitle = 'Translate Models';
-        
+        BackendMenu::setContext('Pensoft.AutoTranslation', 'autotranslation', 'models');
+
         $this->vars['locales'] = Locale::isEnabled()->get();
         $this->vars['defaultLocale'] = Locale::getDefault();
-        
+        $this->vars['sourceLocale'] = $this->getConfiguredSourceLocale();
+
         // Get translatable models from the system
         $this->vars['translatableModels'] = $this->getTranslatableModels();
     }
@@ -62,50 +105,108 @@ class AutoTranslate extends Controller
      */
     public function onTranslateMessages()
     {
-        $sourceLocale = post('source_locale');
-        $targetLocales = post('target_locales', []);
-        $messageIds = post('message_ids', []);
-        $overwrite = (bool) post('overwrite', false);
-        
-        // Validation
-        if (empty($sourceLocale)) {
-            Flash::error('Please select a source language');
+        $data = $this->getMessageTranslationData();
+
+        if (!$this->validateMessageTranslationData($data)) {
             return;
         }
-        
-        if (empty($targetLocales)) {
-            Flash::error('Please select at least one target language');
-            return;
-        }
-        
+
         try {
-            $manager = new TranslationManager();
-            $totalTranslated = 0;
-            
-            foreach ($targetLocales as $targetLocale) {
-                if ($targetLocale === $sourceLocale) {
-                    continue;
-                }
-                
-                $count = $manager->translateMessages(
-                    $sourceLocale,
-                    $targetLocale,
-                    $messageIds,
-                    $overwrite
-                );
-                
-                $totalTranslated += $count;
-            }
-            
-            if ($totalTranslated > 0) {
-                Flash::success("Successfully translated {$totalTranslated} messages");
-            } else {
-                Flash::warning('No messages were translated. They may already be translated or empty.');
-            }
+            $totalTranslated = $this->performMessagesTranslation($data);
+            $this->showTranslationResult($totalTranslated);
         } catch (\Exception $e) {
-            Flash::error('Translation failed: ' . $e->getMessage());
-            \Log::error('Message translation error: ' . $e->getMessage());
+            $this->handleTranslationError('Message translation error', $e);
         }
+    }
+
+    /**
+     * Get message translation data from post
+     *
+     * @return array
+     */
+    protected function getMessageTranslationData()
+    {
+        $sourceLocale = $this->getConfiguredSourceLocale();
+
+        return [
+            'sourceLocale' => $sourceLocale->code,
+            'targetLocales' => post('target_locales', []),
+            'messageIds' => post('message_ids', []),
+            'overwrite' => (bool) post('overwrite', false)
+        ];
+    }
+
+    /**
+     * Validate message translation data
+     *
+     * @param array $data
+     * @return bool
+     */
+    protected function validateMessageTranslationData(array $data)
+    {
+        if (empty($data['targetLocales'])) {
+            Flash::error('Please select at least one target language');
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Perform messages translation
+     *
+     * @param array $data
+     * @return int
+     */
+    protected function performMessagesTranslation(array $data)
+    {
+        $manager = $this->getTranslationManager();
+        $totalTranslated = 0;
+
+        foreach ($data['targetLocales'] as $targetLocale) {
+            if ($targetLocale === $data['sourceLocale']) {
+                continue;
+            }
+
+            $count = $manager->translateMessages(
+                $data['sourceLocale'],
+                $targetLocale,
+                $data['messageIds'],
+                $data['overwrite']
+            );
+
+            $totalTranslated += $count;
+        }
+
+        return $totalTranslated;
+    }
+
+    /**
+     * Show translation result flash message
+     *
+     * @param int $totalTranslated
+     * @return void
+     */
+    protected function showTranslationResult($totalTranslated)
+    {
+        if ($totalTranslated > 0) {
+            Flash::success("Successfully translated {$totalTranslated} messages");
+        } else {
+            Flash::warning('No messages were translated. They may already be translated or empty.');
+        }
+    }
+
+    /**
+     * Handle translation error
+     *
+     * @param string $context
+     * @param \Exception $e
+     * @return void
+     */
+    protected function handleTranslationError($context, \Exception $e)
+    {
+        Flash::error('Translation failed: ' . $e->getMessage());
+        \Log::error("{$context}: " . $e->getMessage());
     }
     
     /**
@@ -113,70 +214,106 @@ class AutoTranslate extends Controller
      */
     public function onTranslateModels()
     {
-        $modelClass = post('model_class');
-        $sourceLocale = post('source_locale');
-        $targetLocales = post('target_locales', []);
-        $modelIds = post('model_ids', []);
-        $selectedFields = post('selected_fields', []); // New: selected fields to translate
-        $overwrite = (bool) post('overwrite', false);
+        $data = $this->getModelTranslationData();
 
-        // Validation
-        if (empty($modelClass)) {
-            Flash::error('Please select a model class');
-            return;
-        }
-
-        if (!class_exists($modelClass)) {
-            Flash::error('Invalid model class');
-            return;
-        }
-
-        if (empty($sourceLocale)) {
-            Flash::error('Please select a source language');
-            return;
-        }
-
-        if (empty($targetLocales)) {
-            Flash::error('Please select at least one target language');
-            return;
-        }
-
-        if (empty($selectedFields)) {
-            Flash::error('Please select at least one field to translate');
+        if (!$this->validateModelTranslationData($data)) {
             return;
         }
 
         try {
-            $manager = new TranslationManager();
-            $translatedCount = 0;
-
-            foreach ($targetLocales as $targetLocale) {
-                if ($targetLocale === $sourceLocale) {
-                    continue;
-                }
-
-                $count = $manager->translateModels(
-                    $modelClass,
-                    $sourceLocale,
-                    $targetLocale,
-                    $modelIds,
-                    [
-                        'fields' => $selectedFields,
-                        'overwrite' => $overwrite
-                    ]
-                );
-
-                $translatedCount += $count;
-            }
-
-            if ($translatedCount > 0) {
-                Flash::success("Successfully translated {$translatedCount} model records");
-            } else {
-                Flash::warning('No models were translated');
-            }
+            $translatedCount = $this->performModelsTranslation($data);
+            $this->showModelTranslationResult($translatedCount);
         } catch (\Exception $e) {
-            Flash::error('Translation failed: ' . $e->getMessage());
-            \Log::error('Model translation error: ' . $e->getMessage());
+            $this->handleTranslationError('Model translation error', $e);
+        }
+    }
+
+    /**
+     * Get model translation data from post
+     *
+     * @return array
+     */
+    protected function getModelTranslationData()
+    {
+        $sourceLocale = $this->getConfiguredSourceLocale();
+
+        return [
+            'modelClass' => post('model_class'),
+            'sourceLocale' => $sourceLocale->code,
+            'targetLocales' => post('target_locales', []),
+            'modelIds' => post('model_ids', []),
+            'overwrite' => (bool) post('overwrite', false)
+        ];
+    }
+
+    /**
+     * Validate model translation data
+     *
+     * @param array $data
+     * @return bool
+     */
+    protected function validateModelTranslationData(array $data)
+    {
+        if (empty($data['modelClass'])) {
+            Flash::error('Please select a model class');
+            return false;
+        }
+
+        if (!class_exists($data['modelClass'])) {
+            Flash::error('Invalid model class');
+            return false;
+        }
+
+        if (empty($data['targetLocales'])) {
+            Flash::error('Please select at least one target language');
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Perform models translation
+     *
+     * @param array $data
+     * @return int
+     */
+    protected function performModelsTranslation(array $data)
+    {
+        $manager = $this->getTranslationManager();
+        $translatedCount = 0;
+
+        foreach ($data['targetLocales'] as $targetLocale) {
+            if ($targetLocale === $data['sourceLocale']) {
+                continue;
+            }
+
+            $count = $manager->translateModels(
+                $data['modelClass'],
+                $data['sourceLocale'],
+                $targetLocale,
+                $data['modelIds'],
+                ['overwrite' => $data['overwrite']]
+            );
+
+            $translatedCount += $count;
+        }
+
+        return $translatedCount;
+    }
+
+    /**
+     * Show model translation result flash message
+     *
+     * @param int $translatedCount
+     * @return void
+     */
+    protected function showModelTranslationResult($translatedCount)
+    {
+        if ($translatedCount > 0) {
+            Flash::success("Successfully translated {$translatedCount} model records");
+        } else {
+            Flash::warning('No models were translated');
         }
     }
     
@@ -189,28 +326,55 @@ class AutoTranslate extends Controller
             $translator = new DeepLTranslator();
             $usage = $translator->getUsage();
 
-            // Also get available languages for debugging
-            $targetLanguages = $translator->getTargetLanguages();
-            \Log::info('DeepL available target languages:', $targetLanguages);
+            $this->logAvailableLanguages($translator);
 
-            $this->vars['usage'] = $usage;
-
-            return [
-                '#usage-info-container' => $this->makePartial('usage_stats', [
-                    'usage' => $usage
-                ])
-            ];
+            return $this->makeUsagePartial($usage);
         } catch (\Exception $e) {
             Flash::error('Failed to check usage: ' . $e->getMessage());
-
-            return [
-                '#usage-info-container' => '<div class="callout callout-danger">
-                    <i class="icon-warning"></i> Error: ' . e($e->getMessage()) . '
-                </div>'
-            ];
+            return $this->makeUsageErrorPartial($e);
         }
     }
-    
+
+    /**
+     * Log available languages for debugging
+     *
+     * @param DeepLTranslator $translator
+     * @return void
+     */
+    protected function logAvailableLanguages(DeepLTranslator $translator)
+    {
+        $targetLanguages = $translator->getTargetLanguages();
+        \Log::info('DeepL available target languages:', $targetLanguages);
+    }
+
+    /**
+     * Make usage stats partial
+     *
+     * @param \DeepL\Usage $usage
+     * @return array
+     */
+    protected function makeUsagePartial($usage)
+    {
+        return [
+            '#usage-info-container' => $this->makePartial('usage_stats', ['usage' => $usage])
+        ];
+    }
+
+    /**
+     * Make usage error partial
+     *
+     * @param \Exception $e
+     * @return array
+     */
+    protected function makeUsageErrorPartial(\Exception $e)
+    {
+        return [
+            '#usage-info-container' => '<div class="callout callout-danger">
+                <i class="icon-warning"></i> Error: ' . e($e->getMessage()) . '
+            </div>'
+        ];
+    }
+
     /**
      * AJAX handler: Test API connection
      */
@@ -218,7 +382,7 @@ class AutoTranslate extends Controller
     {
         try {
             $translator = new DeepLTranslator();
-            
+
             if ($translator->testConnection()) {
                 Flash::success('Connection successful! DeepL API is working correctly.');
             } else {
@@ -228,7 +392,7 @@ class AutoTranslate extends Controller
             Flash::error('Connection test failed: ' . $e->getMessage());
         }
     }
-    
+
     /**
      * AJAX handler: Get translation statistics
      */
@@ -236,26 +400,39 @@ class AutoTranslate extends Controller
     {
         $sourceLocale = post('source_locale');
         $targetLocale = post('target_locale');
-        
+
         if (empty($sourceLocale) || empty($targetLocale)) {
             return ['error' => 'Please select both source and target languages'];
         }
-        
+
         try {
-            $manager = new TranslationManager();
+            $manager = $this->getTranslationManager();
             $stats = $manager->getTranslationStats($sourceLocale, $targetLocale);
-            
-            return [
-                'stats' => $stats,
-                'html' => $this->makePartial('stats', [
-                    'stats' => $stats,
-                    'sourceLocale' => $sourceLocale,
-                    'targetLocale' => $targetLocale
-                ])
-            ];
+
+            return $this->makeStatsResponse($stats, $sourceLocale, $targetLocale);
         } catch (\Exception $e) {
             return ['error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Make stats response
+     *
+     * @param array $stats
+     * @param string $sourceLocale
+     * @param string $targetLocale
+     * @return array
+     */
+    protected function makeStatsResponse(array $stats, $sourceLocale, $targetLocale)
+    {
+        return [
+            'stats' => $stats,
+            'html' => $this->makePartial('stats', [
+                'stats' => $stats,
+                'sourceLocale' => $sourceLocale,
+                'targetLocale' => $targetLocale
+            ])
+        ];
     }
     
     /**
@@ -266,80 +443,186 @@ class AutoTranslate extends Controller
     protected function getTranslatableModels()
     {
         $models = [];
-
-        // Use October CMS PluginManager to discover all plugins
-        $pluginManager = \System\Classes\PluginManager::instance();
-        $plugins = $pluginManager->getPlugins();
+        $plugins = $this->getAllPlugins();
 
         foreach ($plugins as $pluginCode => $pluginObj) {
-            // Get plugin details
-            [$author, $plugin] = explode('.', $pluginCode);
+            $pluginModels = $this->scanPluginForModels($pluginCode);
+            $models = array_merge($models, $pluginModels);
+        }
 
-            // Build the models directory path
-            $modelsPath = plugins_path(strtolower($author) . '/' . strtolower($plugin) . '/models');
+        return $this->sortModelsByLabel($models);
+    }
 
-            if (!is_dir($modelsPath)) {
-                continue;
-            }
+    /**
+     * Get all plugins from PluginManager
+     *
+     * @return array
+     */
+    protected function getAllPlugins()
+    {
+        $pluginManager = \System\Classes\PluginManager::instance();
+        return $pluginManager->getPlugins();
+    }
 
-            // Scan for model files
-            $modelFiles = glob($modelsPath . '/*.php');
+    /**
+     * Scan plugin for translatable models
+     *
+     * @param string $pluginCode
+     * @return array
+     */
+    protected function scanPluginForModels($pluginCode)
+    {
+        $models = [];
+        [$author, $plugin] = explode('.', $pluginCode);
 
-            foreach ($modelFiles as $modelFile) {
-                $modelName = basename($modelFile, '.php');
+        $modelsPath = $this->getPluginModelsPath($author, $plugin);
 
-                // Skip lowercase files (settings, imports, exports)
-                if (ctype_lower($modelName[0])) {
-                    continue;
-                }
+        if (!is_dir($modelsPath)) {
+            return $models;
+        }
 
-                // Build the full class name
-                $className = ucfirst($author) . '\\' . ucfirst($plugin) . '\\Models\\' . $modelName;
+        $modelFiles = glob($modelsPath . '/*.php');
 
-                if (!class_exists($className)) {
-                    continue;
-                }
+        foreach ($modelFiles as $modelFile) {
+            $modelInfo = $this->processModelFile($modelFile, $author, $plugin, $pluginCode);
 
-                try {
-                    $instance = new $className();
-
-                    // Check if model uses TranslatableModel behavior
-                    if (!$instance->isClassExtendedWith(\RainLab\Translate\Behaviors\TranslatableModel::class)) {
-                        continue;
-                    }
-
-                    // Get translatable fields with metadata
-                    $fields = $this->getModelTranslatableFields($instance);
-
-                    if (empty($fields)) {
-                        continue;
-                    }
-
-                    // Get record count
-                    $recordCount = $className::count();
-
-                    // Create readable label
-                    $label = ucfirst($author) . ' › ' . $this->makeLabel($plugin) . ' › ' . $this->makeLabel($modelName);
-
-                    $models[$className] = [
-                        'label' => $label,
-                        'plugin' => $pluginCode,
-                        'author' => $author,
-                        'pluginName' => $plugin,
-                        'modelName' => $modelName,
-                        'fields' => $fields,
-                        'recordCount' => $recordCount,
-                        'tableName' => $instance->getTable()
-                    ];
-
-                } catch (\Exception $e) {
-                    \Log::debug("Could not process model {$className}: " . $e->getMessage());
-                    continue;
-                }
+            if ($modelInfo) {
+                $models[$modelInfo['className']] = $modelInfo['data'];
             }
         }
 
-        // Sort by label
+        return $models;
+    }
+
+    /**
+     * Get plugin models directory path
+     *
+     * @param string $author
+     * @param string $plugin
+     * @return string
+     */
+    protected function getPluginModelsPath($author, $plugin)
+    {
+        return plugins_path(strtolower($author) . '/' . strtolower($plugin) . '/models');
+    }
+
+    /**
+     * Process a model file
+     *
+     * @param string $modelFile
+     * @param string $author
+     * @param string $plugin
+     * @param string $pluginCode
+     * @return array|null
+     */
+    protected function processModelFile($modelFile, $author, $plugin, $pluginCode)
+    {
+        $modelName = basename($modelFile, '.php');
+
+        if ($this->shouldSkipModel($modelName)) {
+            return null;
+        }
+
+        $className = $this->buildModelClassName($author, $plugin, $modelName);
+
+        if (!class_exists($className)) {
+            return null;
+        }
+
+        try {
+            $instance = new $className();
+
+            if (!$this->isTranslatableModel($instance)) {
+                return null;
+            }
+
+            $fields = $this->getModelTranslatableFields($instance);
+
+            if (empty($fields)) {
+                return null;
+            }
+
+            return [
+                'className' => $className,
+                'data' => $this->buildModelInfo($instance, $className, $author, $plugin, $pluginCode, $modelName, $fields)
+            ];
+        } catch (\Exception $e) {
+            \Log::debug("Could not process model {$className}: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Check if model should be skipped
+     *
+     * @param string $modelName
+     * @return bool
+     */
+    protected function shouldSkipModel($modelName)
+    {
+        return ctype_lower($modelName[0]);
+    }
+
+    /**
+     * Build model class name
+     *
+     * @param string $author
+     * @param string $plugin
+     * @param string $modelName
+     * @return string
+     */
+    protected function buildModelClassName($author, $plugin, $modelName)
+    {
+        return ucfirst($author) . '\\' . ucfirst($plugin) . '\\Models\\' . $modelName;
+    }
+
+    /**
+     * Check if model is translatable
+     *
+     * @param \October\Rain\Database\Model $instance
+     * @return bool
+     */
+    protected function isTranslatableModel($instance)
+    {
+        return $instance->isClassExtendedWith(\RainLab\Translate\Behaviors\TranslatableModel::class);
+    }
+
+    /**
+     * Build model info array
+     *
+     * @param \October\Rain\Database\Model $instance
+     * @param string $className
+     * @param string $author
+     * @param string $plugin
+     * @param string $pluginCode
+     * @param string $modelName
+     * @param array $fields
+     * @return array
+     */
+    protected function buildModelInfo($instance, $className, $author, $plugin, $pluginCode, $modelName, array $fields)
+    {
+        $label = ucfirst($author) . ' › ' . $this->makeLabel($plugin) . ' › ' . $this->makeLabel($modelName);
+
+        return [
+            'label' => $label,
+            'plugin' => $pluginCode,
+            'author' => $author,
+            'pluginName' => $plugin,
+            'modelName' => $modelName,
+            'fields' => $fields,
+            'recordCount' => $className::count(),
+            'tableName' => $instance->getTable()
+        ];
+    }
+
+    /**
+     * Sort models by label
+     *
+     * @param array $models
+     * @return array
+     */
+    protected function sortModelsByLabel(array $models)
+    {
         uasort($models, function($a, $b) {
             return strcmp($a['label'], $b['label']);
         });

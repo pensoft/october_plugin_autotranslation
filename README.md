@@ -134,21 +134,18 @@ $count = $manager->translateMessages('en', 'de');
 
 ## Supported Languages
 
-DeepL supports translation between:
-- English (en)
-- German (de)
-- French (fr)
-- Spanish (es)
-- Italian (it)
-- Dutch (nl)
-- Polish (pl)
-- Portuguese (pt)
-- Russian (ru)
-- Japanese (ja)
-- Chinese (zh)
-- And more...
+DeepL supports translation between many languages. When configuring locales in **Settings → Translate → Locales**, use DeepL-compatible codes:
 
-See [DeepL Documentation](https://www.deepl.com/docs-api/) for the complete list.
+- English: `EN-US`, `EN-GB`
+- Portuguese: `PT-PT`, `PT-BR`
+- Most other languages: Use uppercase 2-letter codes (`BG`, `FR`, `DE`, `ES`, `IT`, `NL`, `PL`, `RU`, `JA`, `ZH`, etc.)
+
+**Important:** Your locale codes in RainLab.Translate must match DeepL's format exactly. For example:
+- Use `BG` (not `bg` or `bulgarian`)
+- Use `EN-US` or `EN-GB` (not just `en`)
+- Use `PT-BR` or `PT-PT` (not just `pt`)
+
+See [DeepL Documentation](https://www.deepl.com/docs-api/) for the complete list of supported languages and their codes.
 
 ## Troubleshooting
 

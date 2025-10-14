@@ -32,6 +32,7 @@ class Settings extends Model
     public $rules = [
         'deepl_api_key' => 'required|min:20',
         'deepl_server_type' => 'required|in:free,pro',
+        'default_source_locale' => 'required',
     ];
 
     /**
@@ -43,7 +44,7 @@ class Settings extends Model
     {
         return Locale::listEnabled();
     }
-    
+
     /**
      * Get default source locale options
      *
@@ -53,6 +54,6 @@ class Settings extends Model
     {
         return Locale::listEnabled();
     }
-    
+
 }
 
