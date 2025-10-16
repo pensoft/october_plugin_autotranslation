@@ -172,10 +172,17 @@
             data-request="onTranslateMessages"
             data-request-confirm="Are you sure you want to translate the messages? This may take some time and will consume DeepL API credits."
             data-stripe-load-indicator
+            data-attach-loading
             id="translateButton"
             disabled>
-            <i class="icon-language"></i>
-            Start Translation
+            <span class="btn-text">
+                <i class="icon-language"></i>
+                Start Translation
+            </span>
+            <span class="btn-loading-text">
+                <i class="icon-spinner icon-spin"></i>
+                Translating...
+            </span>
         </button>
 
         <div class="secondary-actions">
@@ -191,6 +198,24 @@
                 <i class="icon-list-alt"></i>
                 View All Messages
             </a>
+        </div>
+    </div>
+</div>
+
+<!-- Translation Loading Overlay -->
+<div id="translationLoadingOverlay" class="translation-loading-overlay">
+    <div class="translation-loading-content">
+        <div class="translation-loader">
+            <div class="bounce1"></div>
+            <div class="bounce2"></div>
+            <div class="bounce3"></div>
+        </div>
+        <h3 class="translation-status-title">Translating Messages...</h3>
+        <div class="translation-status-languages"></div>
+        <div class="translation-warning">
+            <i class="icon-warning"></i>
+            <p>Please wait while translations are being processed.<br>
+            <strong>Do not close or refresh this page.</strong></p>
         </div>
     </div>
 </div>

@@ -33,10 +33,10 @@ class AutoTranslate extends Controller
         // Default context - will be overridden by individual page methods
         BackendMenu::setContext('Pensoft.AutoTranslation', 'autotranslation');
 
-        // Register plugin assets
+        // Register shared CSS (used across all pages)
         $this->addCss('/plugins/pensoft/autotranslation/assets/css/autotranslation.css', 'Pensoft.AutoTranslation');
-        $this->addJs('/plugins/pensoft/autotranslation/assets/js/models.js', 'Pensoft.AutoTranslation');
-        $this->addJs('/plugins/pensoft/autotranslation/assets/js/messages.js', 'Pensoft.AutoTranslation');
+
+        // Note: Page-specific JS is loaded in individual action methods to prevent conflicts
     }
 
     /**
@@ -82,6 +82,9 @@ class AutoTranslate extends Controller
         $this->pageTitle = 'Translate Messages';
         BackendMenu::setContext('Pensoft.AutoTranslation', 'autotranslation', 'messages');
 
+        // Register page-specific JavaScript
+        $this->addJs('/plugins/pensoft/autotranslation/assets/js/messages.js', 'Pensoft.AutoTranslation');
+
         $this->vars['locales'] = Locale::isEnabled()->get();
         $this->vars['defaultLocale'] = Locale::getDefault();
         $this->vars['sourceLocale'] = $this->getConfiguredSourceLocale();
@@ -96,6 +99,9 @@ class AutoTranslate extends Controller
     {
         $this->pageTitle = 'Translate Models';
         BackendMenu::setContext('Pensoft.AutoTranslation', 'autotranslation', 'models');
+
+        // Register page-specific JavaScript
+        $this->addJs('/plugins/pensoft/autotranslation/assets/js/models.js', 'Pensoft.AutoTranslation');
 
         $this->vars['locales'] = Locale::isEnabled()->get();
         $this->vars['defaultLocale'] = Locale::getDefault();

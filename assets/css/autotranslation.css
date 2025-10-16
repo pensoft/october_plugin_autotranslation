@@ -594,6 +594,16 @@ input:checked + .toggle-slider:before {
     font-weight: 600;
     letter-spacing: 0.5px;
     transition: all 0.3s;
+    color: #fff !important;
+}
+
+.btn-translate .btn-text,
+.btn-translate .btn-loading-text {
+    color: #fff !important;
+}
+
+.btn-translate i {
+    color: #fff !important;
 }
 
 .btn-translate:hover:not(:disabled) {
@@ -617,6 +627,195 @@ input:checked + .toggle-slider:before {
     font-size: 14px;
 }
 
+/* Translation Loading Overlay */
+.translation-loading-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+}
+
+.translation-loading-content {
+    background: white;
+    border-radius: 12px;
+    padding: 40px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    animation: slideUp 0.3s ease;
+}
+
+/* Loading Spinner - Bouncing Dots */
+.translation-loader {
+    margin: 0 auto 30px;
+    width: 80px;
+    text-align: center;
+}
+
+.translation-loader > div {
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 100%;
+    display: inline-block;
+    margin: 0 4px;
+    animation: bouncingLoader 1.4s infinite ease-in-out both;
+}
+
+.translation-loader .bounce1 {
+    animation-delay: -0.32s;
+}
+
+.translation-loader .bounce2 {
+    animation-delay: -0.16s;
+}
+
+@keyframes bouncingLoader {
+    0%, 80%, 100% {
+        transform: scale(0);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1.0);
+        opacity: 1;
+    }
+}
+
+/* Status Title */
+.translation-status-title {
+    font-size: 24px;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 20px 0;
+}
+
+/* Languages List */
+.translation-status-languages {
+    margin: 20px 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.translation-lang-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    font-size: 14px;
+    color: #555;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.translation-lang-item:last-child {
+    border-bottom: none;
+}
+
+.translation-lang-item i {
+    color: #667eea;
+    font-size: 16px;
+}
+
+/* Warning Message */
+.translation-warning {
+    margin-top: 20px;
+    padding: 16px;
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    color: #856404;
+}
+
+.translation-warning i {
+    font-size: 20px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.translation-warning p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.translation-warning strong {
+    font-weight: 600;
+}
+
+/* Button Loading States */
+.btn-translate.oc-loading .btn-text {
+    display: none;
+}
+
+.btn-translate.oc-loading .btn-loading-text {
+    display: inline-block !important;
+}
+
+.btn-translate.oc-loading {
+    opacity: 0.8;
+    cursor: wait;
+}
+
+.btn-loading-text {
+    display: none;
+}
+
+/* Body State When Translation Active */
+body.translation-in-progress {
+    overflow: hidden;
+}
+
+body.translation-in-progress .autotranslate-ui {
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Icon Spin Animation */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.icon-spin {
+    animation: spin 1s linear infinite;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .source-language-card {
@@ -630,5 +829,18 @@ input:checked + .toggle-slider:before {
 
     .change-action .btn {
         width: 100%;
+    }
+
+    .translation-loading-content {
+        padding: 30px 20px;
+        width: 95%;
+    }
+
+    .translation-status-title {
+        font-size: 20px;
+    }
+
+    .translation-status-languages {
+        max-height: 150px;
     }
 }
