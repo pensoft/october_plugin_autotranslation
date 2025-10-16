@@ -32,6 +32,11 @@ class AutoTranslate extends Controller
 
         // Default context - will be overridden by individual page methods
         BackendMenu::setContext('Pensoft.AutoTranslation', 'autotranslation');
+
+        // Register plugin assets
+        $this->addCss('/plugins/pensoft/autotranslation/assets/css/autotranslation.css', 'Pensoft.AutoTranslation');
+        $this->addJs('/plugins/pensoft/autotranslation/assets/js/models.js', 'Pensoft.AutoTranslation');
+        $this->addJs('/plugins/pensoft/autotranslation/assets/js/messages.js', 'Pensoft.AutoTranslation');
     }
 
     /**
