@@ -3,6 +3,140 @@
 return [
     /*
     |--------------------------------------------------------------------------
+    | Field Type Filtering
+    |--------------------------------------------------------------------------
+    |
+    | Defines which field types should or should not be translated.
+    | Customize these arrays to match your project's field type conventions.
+    |
+    */
+
+    'field_types' => [
+        // Form field types that should never be translated
+        'excluded_types' => [
+            'dropdown',
+            'radio',
+            'checkbox',
+            'checkboxlist',
+            'switch',
+            'number',
+            'datepicker',
+            'timepicker',
+            'colorpicker',
+            'mediafinder',
+            'fileupload',
+            'relation',
+            'repeater',
+            'partial',
+        ],
+
+        // Form field types that contain translatable content
+        'translatable_types' => [
+            'text',
+            'textarea',
+            'richeditor',
+            'markdown',
+            'mltext',
+            'mltextarea',
+            'mlricheditor',
+            'mlmarkdowneditor',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Field Name Patterns
+    |--------------------------------------------------------------------------
+    |
+    | Regex patterns for field names that should be excluded from translation.
+    | Useful for automatically detecting system fields, IDs, timestamps, etc.
+    |
+    */
+
+    'field_patterns' => [
+        // Regex patterns for fields to exclude from translation
+        'excluded_patterns' => [
+            '/slug$/i',
+            '/url$/i',
+            '/uri$/i',
+            '/code$/i',
+            '/key$/i',
+            '/_key$/i',
+            '/^id$/i',
+            '/_id$/i',
+            '/_at$/i',
+            '/^created_at$/i',
+            '/^updated_at$/i',
+            '/^deleted_at$/i',
+            '/sort_order$/i',
+            '/^sort$/i',
+            '/^order$/i',
+            '/^position$/i',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Field Type Heuristics
+    |--------------------------------------------------------------------------
+    |
+    | Used by ModelDiscoveryService to automatically guess field types based
+    | on field names. Customize these to match your project's naming conventions.
+    |
+    */
+
+    'field_type_heuristics' => [
+        // Field names that typically contain rich text/HTML content
+        'rich_text_fields' => [
+            'content',
+            'description',
+            'body',
+            'text',
+            'excerpt',
+            'summary',
+            'bio',
+            'about',
+        ],
+
+        // Field names that are typically slugs or URL-safe identifiers
+        'slug_fields' => [
+            'slug',
+            'code',
+            'url',
+            'uri',
+            'handle',
+        ],
+
+        // Field names for SEO/meta content
+        'meta_fields' => [
+            'keywords',
+            'meta_title',
+            'meta_description',
+            'seo_title',
+            'seo_description',
+            'og_title',
+            'og_description',
+            'twitter_title',
+            'twitter_description',
+        ],
+
+        // Field names that should not be translated by default
+        'skip_translation_fields' => [
+            'slug',
+            'code',
+            'url',
+            'published',
+            'external',
+            'type',
+            'status',
+            'is_published',
+            'is_active',
+            'is_featured',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Default Field Exclusions
     |--------------------------------------------------------------------------
     |
