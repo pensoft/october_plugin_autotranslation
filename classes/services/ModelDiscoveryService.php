@@ -7,7 +7,6 @@ use Pensoft\AutoTranslation\Classes\FieldFilter;
  * Model Discovery Service
  *
  * Discovers and catalogs translatable models across all installed plugins
- * Single Responsibility: Model scanning and metadata extraction
  */
 class ModelDiscoveryService
 {

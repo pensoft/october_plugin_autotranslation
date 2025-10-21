@@ -7,7 +7,6 @@ use Pensoft\AutoTranslation\Classes\DeepLTranslator;
  * DeepL Translation Provider
  *
  * Adapter that wraps DeepLTranslator to implement TranslationProviderInterface
- * Follows Adapter Pattern and Dependency Inversion Principle
  */
 class DeepLProvider implements TranslationProviderInterface
 {

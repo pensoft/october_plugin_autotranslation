@@ -56,6 +56,29 @@ tabs:
                 code
                 api_key
 
+        # Performance Settings
+        batch_enabled:
+            tab: Performance
+            label: Enable Batch Translation
+            type: switch
+            span: left
+            default: true
+            comment: Use batch processing for faster translations and lower API costs (recommended)
+
+        batch_size:
+            tab: Performance
+            label: Batch Size
+            type: number
+            span: right
+            default: 50
+            min: 1
+            max: 50
+            comment: Number of texts to translate per API call (max 50 for DeepL)
+            trigger:
+                action: show
+                field: batch_enabled
+                condition: checked
+
 secondaryTabs:
     fields:
         usage_info:

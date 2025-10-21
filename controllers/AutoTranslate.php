@@ -45,7 +45,7 @@ class AutoTranslate extends Controller
         // Register shared CSS (used across all pages)
         $this->addCss('/plugins/pensoft/autotranslation/assets/css/autotranslation.css', 'Pensoft.AutoTranslation');
 
-        // Note: Page-specific JS is loaded in individual action methods to prevent conflicts
+        // @Note: Page-specific JS is loaded in individual action methods to prevent conflicts
     }
 
     /**

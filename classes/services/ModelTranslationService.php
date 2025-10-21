@@ -5,12 +5,13 @@ use RainLab\Translate\Behaviors\TranslatableModel;
 use October\Rain\Database\Model;
 use Pensoft\AutoTranslation\Classes\Contracts\TranslationProviderInterface;
 use Pensoft\AutoTranslation\Classes\FieldFilter;
+use Pensoft\AutoTranslation\Classes\Strategies\DeepLBatchStrategy;
+use Pensoft\AutoTranslation\Classes\Services\TranslationBatchCollector;
 
 /**
  * Model Translation Service
  *
  * Handles translation of October CMS models that implement TranslatableModel behavior
- * Single Responsibility: Model-specific translation operations
  */
 class ModelTranslationService
 {
@@ -30,21 +31,29 @@ class ModelTranslationService
     protected $normalizer;
 
     /**
+     * @var TranslationBatchCollector
+     */
+    protected $batchCollector;
+
+    /**
      * Constructor
      *
      * @param TranslationProviderInterface $provider
      * @param FieldFilter|null $filter
      * @param LocaleNormalizer|null $normalizer
+     * @param TranslationBatchCollector|null $batchCollector
      */
     public function __construct(
         TranslationProviderInterface $provider,
         ?FieldFilter $filter = null,
-        ?LocaleNormalizer $normalizer = null
+        ?LocaleNormalizer $normalizer = null,
+        ?TranslationBatchCollector $batchCollector = null
     )
     {
         $this->provider = $provider;
         $this->filter = $filter ?: new FieldFilter();
         $this->normalizer = $normalizer ?: new LocaleNormalizer();
+        $this->batchCollector = $batchCollector ?: new TranslationBatchCollector();
     }
 
     /**
@@ -89,7 +98,127 @@ class ModelTranslationService
     }
 
     /**
-     * Translate multiple models in batch
+     * Translate multiple models using batch processing (recommended for performance)
+     *
+     * @param string $modelClass
+     * @param string $sourceLocale
+     * @param string $targetLocale
+     * @param array $modelIds
+     * @param array $options
+     * @return int Number of translated models
+     */
+    public function translateModelsInBatch(
+        $modelClass,
+        $sourceLocale,
+        $targetLocale,
+        array $modelIds = [],
+        array $options = []
+    )
+    {
+        if (!class_exists($modelClass)) {
+            throw new \Exception("Model class {$modelClass} not found");
+        }
+
+        $query = $modelClass::query();
+
+        if (!empty($modelIds)) {
+            $query->whereIn('id', $modelIds);
+        }
+
+        $models = $query->get();
+
+        if ($models->isEmpty()) {
+            return 0;
+        }
+
+        // Normalize locale codes
+        $normalizedSource = $this->normalizer->normalize($sourceLocale);
+        $normalizedTarget = $this->normalizer->normalize($targetLocale);
+
+        $overwrite = $options['overwrite'] ?? false;
+        $batchSize = $options['batch_size'] ?? null;
+
+        // Prepare translatable attributes
+        $firstModel = $models->first();
+        $this->validateTranslatableModel($firstModel);
+        $attributes = $this->prepareAttributesForTranslation($firstModel, $options);
+
+        if (empty($attributes)) {
+            \Log::warning("No translatable attributes found for model {$modelClass}");
+            return 0;
+        }
+
+        \Log::info("Starting batch translation for {$models->count()} {$modelClass} models, {$sourceLocale} -> {$targetLocale}");
+
+        // Collect all translatable texts from all models
+        $collection = $this->batchCollector->collectFromModels($models, $attributes, $sourceLocale, $targetLocale, $overwrite);
+
+        if (empty($collection['texts'])) {
+            \Log::info("No texts to translate (skipped: {$collection['stats']['skipped_empty']} empty, {$collection['stats']['skipped_existing']} existing)");
+            return 0;
+        }
+
+        // Create batch strategy and process
+        $batchStrategy = new DeepLBatchStrategy($this->provider, $batchSize);
+        $batches = $batchStrategy->createBatches($collection['texts']);
+
+        \Log::info("Processing " . count($collection['texts']) . " texts in " . count($batches) . " batch(es)");
+
+        // Process all batches
+        $allResults = [];
+        foreach ($batches as $batchIndex => $batch) {
+            try {
+                \Log::debug("Processing batch " . ($batchIndex + 1) . " of " . count($batches) . " (" . count($batch) . " items)");
+
+                $results = $batchStrategy->processBatch($batch, $normalizedSource, $normalizedTarget, $options);
+                $allResults = array_merge($allResults, $results);
+            } catch (\Exception $e) {
+                \Log::error("Batch translation failed for batch {$batchIndex}: " . $e->getMessage());
+                continue;
+            }
+        }
+
+        // Map results back and save
+        $mapped = $this->batchCollector->mapResults($allResults, $collection['map']);
+
+        // Group by model for efficient saving
+        $translationsByModel = [];
+        foreach ($mapped as $result) {
+            $model = $result['item']['model'];
+            $attribute = $result['item']['attribute'];
+            $translatedText = $result['translated'];
+
+            $modelId = $model->id;
+            if (!isset($translationsByModel[$modelId])) {
+                $translationsByModel[$modelId] = [
+                    'model' => $model,
+                    'translations' => []
+                ];
+            }
+
+            $translationsByModel[$modelId]['translations'][$attribute] = $translatedText;
+        }
+
+        // Save all translations
+        $count = 0;
+        foreach ($translationsByModel as $data) {
+            try {
+                $this->saveTranslatedModel($data['model'], $data['translations'], $targetLocale);
+                $count++;
+                \Log::info("Saved translations for model {$modelClass} ID {$data['model']->id}");
+            } catch (\Exception $e) {
+                \Log::error("Failed to save translations for model ID {$data['model']->id}: " . $e->getMessage());
+            }
+        }
+
+        \Log::info("Batch translation complete: {$count} models translated");
+
+        return $count;
+    }
+
+    /**
+     * Translate multiple models in batch (original individual method)
+     * Kept for backward compatibility. Use translateModelsInBatch() for better performance.
      *
      * @param string $modelClass
      * @param string $sourceLocale

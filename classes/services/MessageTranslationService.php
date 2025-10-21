@@ -2,12 +2,13 @@
 
 use RainLab\Translate\Models\Message;
 use Pensoft\AutoTranslation\Classes\Contracts\TranslationProviderInterface;
+use Pensoft\AutoTranslation\Classes\Strategies\DeepLBatchStrategy;
+use Pensoft\AutoTranslation\Classes\Services\TranslationBatchCollector;
 
 /**
  * Message Translation Service
  *
  * Handles translation of RainLab.Translate messages (UI strings, labels, etc.)
- * Single Responsibility: Message-specific translation operations
  */
 class MessageTranslationService
 {
@@ -22,22 +23,112 @@ class MessageTranslationService
     protected $normalizer;
 
     /**
+     * @var TranslationBatchCollector
+     */
+    protected $batchCollector;
+
+    /**
      * Constructor
      *
      * @param TranslationProviderInterface $provider
      * @param LocaleNormalizer|null $normalizer
+     * @param TranslationBatchCollector|null $batchCollector
      */
     public function __construct(
         TranslationProviderInterface $provider,
-        ?LocaleNormalizer $normalizer = null
+        ?LocaleNormalizer $normalizer = null,
+        ?TranslationBatchCollector $batchCollector = null
     )
     {
         $this->provider = $provider;
         $this->normalizer = $normalizer ?: new LocaleNormalizer();
+        $this->batchCollector = $batchCollector ?: new TranslationBatchCollector();
     }
 
     /**
-     * Translate messages from source to target locale
+     * Translate messages using batch processing (recommended for performance)
+     *
+     * @param string $sourceLocale
+     * @param string $targetLocale
+     * @param array $messageIds
+     * @param bool $overwrite
+     * @param int|null $batchSize Custom batch size (default: 50)
+     * @return int Number of translated messages
+     */
+    public function translateMessagesInBatch($sourceLocale, $targetLocale, array $messageIds = [], $overwrite = false, $batchSize = null)
+    {
+        // Normalize locale codes for translation provider
+        $normalizedTarget = $this->normalizer->normalize($targetLocale);
+        $normalizedSource = $this->normalizer->normalize($sourceLocale);
+
+        $this->validateTargetLanguage($normalizedTarget);
+
+        $messages = $this->fetchMessages($messageIds);
+
+        $this->logTranslationStart($messages, $sourceLocale, $targetLocale, $overwrite);
+
+        // Collect translatable texts
+        $collection = $this->batchCollector->collectFromMessages($messages, $sourceLocale, $targetLocale, $overwrite);
+
+        $stats = [
+            'count' => 0,
+            'skipped' => [
+                'empty' => $collection['stats']['skipped_empty'],
+                'already_translated' => $collection['stats']['skipped_existing']
+            ]
+        ];
+
+        if (empty($collection['texts'])) {
+            $this->logTranslationComplete($stats);
+            return $stats['count'];
+        }
+
+        // Create batch strategy
+        $batchStrategy = new DeepLBatchStrategy($this->provider, $batchSize);
+        $batches = $batchStrategy->createBatches($collection['texts']);
+
+        \Log::info("Processing {$messages->count()} messages in " . count($batches) . " batch(es)");
+
+        // Process all batches
+        $allResults = [];
+        foreach ($batches as $batchIndex => $batch) {
+            try {
+                \Log::debug("Processing batch " . ($batchIndex + 1) . " of " . count($batches) . " (" . count($batch) . " items)");
+
+                $results = $batchStrategy->processBatch($batch, $normalizedSource, $normalizedTarget);
+                $allResults = array_merge($allResults, $results);
+            } catch (\Exception $e) {
+                \Log::error("Batch translation failed for batch {$batchIndex}: " . $e->getMessage());
+                continue;
+            }
+        }
+
+        // Map results back and save
+        $mapped = $this->batchCollector->mapResults($allResults, $collection['map']);
+
+        foreach ($mapped as $result) {
+            try {
+                $message = $result['item'];
+                $translatedText = $result['translated'];
+
+                $this->logMessageTranslationResult($message, $translatedText);
+
+                // Use original code for October CMS storage
+                $message->toLocale($targetLocale, $translatedText);
+                $stats['count']++;
+            } catch (\Exception $e) {
+                \Log::error("Failed to save translated message: " . $e->getMessage());
+            }
+        }
+
+        $this->logTranslationComplete($stats);
+
+        return $stats['count'];
+    }
+
+    /**
+     * Translate messages from source to target locale (original individual method)
+     * Kept for backward compatibility. Use translateMessagesInBatch() for better performance.
      *
      * @param string $sourceLocale
      * @param string $targetLocale

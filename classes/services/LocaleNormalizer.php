@@ -5,8 +5,6 @@
  *
  * Handles locale code normalization and mapping between October CMS locale codes
  * and translation provider-specific formats (e.g., DeepL requires uppercase codes)
- *
- * Single Responsibility: Locale code transformation only
  */
 class LocaleNormalizer
 {

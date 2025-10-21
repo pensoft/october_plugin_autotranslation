@@ -8,14 +8,10 @@ use Pensoft\AutoTranslation\Classes\Providers\DeepLProvider;
 use Pensoft\AutoTranslation\Classes\Services\ModelTranslationService;
 use Pensoft\AutoTranslation\Classes\Services\MessageTranslationService;
 use Pensoft\AutoTranslation\Classes\Services\LocaleNormalizer;
+use Pensoft\AutoTranslation\Models\Settings;
 
 /**
  * Translation Manager - Orchestrates translation operations
- *
- * Refactored to follow SOLID principles:
- * - Single Responsibility: Orchestration only, delegates to specialized services
- * - Open/Closed: Extensible via TranslationProviderInterface
- * - Dependency Inversion: Depends on abstractions (interfaces) not concrete classes
  */
 class TranslationManager
 {
@@ -80,6 +76,7 @@ class TranslationManager
 
     /**
      * Translate messages from source to target locale
+     * Automatically uses batch processing if enabled in settings
      *
      * @param string $sourceLocale
      * @param string $targetLocale
@@ -89,11 +86,21 @@ class TranslationManager
      */
     public function translateMessages($sourceLocale, $targetLocale, array $messageIds = [], $overwrite = false)
     {
-        return $this->messageService->translateMessages($sourceLocale, $targetLocale, $messageIds, $overwrite);
+        $useBatch = $this->isBatchingEnabled();
+        $batchSize = $this->getBatchSize();
+
+        if ($useBatch) {
+            \Log::info("Using batch translation for messages (batch size: {$batchSize})");
+            return $this->messageService->translateMessagesInBatch($sourceLocale, $targetLocale, $messageIds, $overwrite, $batchSize);
+        } else {
+            \Log::info("Using individual translation for messages (batch mode disabled)");
+            return $this->messageService->translateMessages($sourceLocale, $targetLocale, $messageIds, $overwrite);
+        }
     }
     
     /**
      * Translate multiple models in batch
+     * Automatically uses batch processing if enabled in settings
      *
      * @param string $modelClass
      * @param string $sourceLocale
@@ -110,7 +117,21 @@ class TranslationManager
         array $options = []
     )
     {
-        return $this->modelService->translateModels($modelClass, $sourceLocale, $targetLocale, $modelIds, $options);
+        $useBatch = $this->isBatchingEnabled();
+        $batchSize = $this->getBatchSize();
+
+        // Add batch size to options if not already set
+        if ($useBatch && !isset($options['batch_size'])) {
+            $options['batch_size'] = $batchSize;
+        }
+
+        if ($useBatch) {
+            \Log::info("Using batch translation for models (batch size: {$batchSize})");
+            return $this->modelService->translateModelsInBatch($modelClass, $sourceLocale, $targetLocale, $modelIds, $options);
+        } else {
+            \Log::info("Using individual translation for models (batch mode disabled)");
+            return $this->modelService->translateModels($modelClass, $sourceLocale, $targetLocale, $modelIds, $options);
+        }
     }
 
     /**
@@ -243,6 +264,26 @@ class TranslationManager
     public function getNormalizer()
     {
         return $this->normalizer;
+    }
+
+    /**
+     * Check if batch translation is enabled in settings
+     *
+     * @return bool
+     */
+    protected function isBatchingEnabled()
+    {
+        return Settings::get('batch_enabled', true);
+    }
+
+    /**
+     * Get batch size from settings
+     *
+     * @return int
+     */
+    protected function getBatchSize()
+    {
+        return (int) Settings::get('batch_size', 50);
     }
 }
 

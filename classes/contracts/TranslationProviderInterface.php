@@ -4,7 +4,6 @@
  * Translation Provider Interface
  *
  * Contract for translation service providers (DeepL, Google Translate, AWS Translate, etc.)
- * Follows Open/Closed Principle - easy to add new providers without modifying existing code
  */
 interface TranslationProviderInterface
 {
