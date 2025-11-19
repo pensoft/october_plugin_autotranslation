@@ -4,3 +4,5 @@
 1.0.1:
     - 'Create translation jobs table for tracking'
     - create_translation_jobs_table.php
+1.0.2:
+    - 'Refactoring'
