@@ -281,7 +281,8 @@ class DeepLTranslator
      */
     protected function performBatchTranslation(array $texts, $sourceLang, $targetLang, array $deeplOptions)
     {
-        return $this->client->translateText($texts, $sourceLang, $targetLang, $deeplOptions);
+        // Use null for auto-detection to avoid issues with language variants and fallback locales
+        return $this->client->translateText($texts, null, $targetLang, $deeplOptions);
     }
 
     /**

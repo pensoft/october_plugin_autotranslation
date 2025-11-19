@@ -13,66 +13,25 @@ class FieldFilter
     protected $settings;
 
     /**
-     * Default field types to exclude from translation
+     * Field types to exclude from translation (loaded from config)
      *
      * @var array
      */
-    protected $excludedTypes = [
-        'dropdown',
-        'radio',
-        'checkbox',
-        'checkboxlist',
-        'switch',
-        'number',
-        'datepicker',
-        'timepicker',
-        'colorpicker',
-        'mediafinder',
-        'fileupload',
-        'relation',
-        'repeater',
-        'partial',
-    ];
+    protected $excludedTypes;
 
     /**
-     * Field name patterns to exclude (regex patterns)
+     * Field name patterns to exclude (regex patterns, loaded from config)
      *
      * @var array
      */
-    protected $excludedPatterns = [
-        '/slug$/i',
-        '/url$/i',
-        '/uri$/i',
-        '/code$/i',
-        '/key$/i',
-        '/_key$/i',
-        '/^id$/i',
-        '/_id$/i',
-        '/_at$/i',
-        '/^created_at$/i',
-        '/^updated_at$/i',
-        '/^deleted_at$/i',
-        '/sort_order$/i',
-        '/^sort$/i',
-        '/^order$/i',
-        '/^position$/i',
-    ];
+    protected $excludedPatterns;
 
     /**
-     * Translatable field types
+     * Translatable field types (loaded from config)
      *
      * @var array
      */
-    protected $translatableTypes = [
-        'text',
-        'textarea',
-        'richeditor',
-        'markdown',
-        'mltext',
-        'mltextarea',
-        'mlricheditor',
-        'mlmarkdowneditor',
-    ];
+    protected $translatableTypes;
 
     /**
      * Constructor
@@ -82,6 +41,11 @@ class FieldFilter
     public function __construct(?Settings $settings = null)
     {
         $this->settings = $settings;
+
+        // Load field type configuration from config file
+        $this->excludedTypes = \Config::get('pensoft.autotranslation::field_types.excluded_types', []);
+        $this->translatableTypes = \Config::get('pensoft.autotranslation::field_types.translatable_types', []);
+        $this->excludedPatterns = \Config::get('pensoft.autotranslation::field_patterns.excluded_patterns', []);
     }
     
     /**
@@ -259,4 +223,3 @@ class FieldFilter
         }
     }
 }
-

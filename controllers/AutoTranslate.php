@@ -4,12 +4,16 @@ use Backend\Classes\Controller;
 use BackendMenu;
 use Pensoft\AutoTranslation\Classes\TranslationManager;
 use Pensoft\AutoTranslation\Classes\DeepLTranslator;
+use Pensoft\AutoTranslation\Classes\Services\ModelDiscoveryService;
 use RainLab\Translate\Models\Locale;
 use RainLab\Translate\Models\Message;
 use Flash;
 
 /**
  * Auto Translate Backend Controller
+ *
+ * Simplified to act as thin layer between HTTP and business logic
+ * Delegates to specialized services for actual work
  */
 class AutoTranslate extends Controller
 {
@@ -24,6 +28,11 @@ class AutoTranslate extends Controller
     protected $translationManager;
 
     /**
+     * @var ModelDiscoveryService
+     */
+    protected $modelDiscovery;
+
+    /**
      * Constructor
      */
     public function __construct()
@@ -36,7 +45,7 @@ class AutoTranslate extends Controller
         // Register shared CSS (used across all pages)
         $this->addCss('/plugins/pensoft/autotranslation/assets/css/autotranslation.css', 'Pensoft.AutoTranslation');
 
-        // Note: Page-specific JS is loaded in individual action methods to prevent conflicts
+        // @Note: Page-specific JS is loaded in individual action methods to prevent conflicts
     }
 
     /**
@@ -51,6 +60,20 @@ class AutoTranslate extends Controller
         }
 
         return $this->translationManager;
+    }
+
+    /**
+     * Get or create model discovery service instance
+     *
+     * @return ModelDiscoveryService
+     */
+    protected function getModelDiscovery()
+    {
+        if (!$this->modelDiscovery) {
+            $this->modelDiscovery = new ModelDiscoveryService();
+        }
+
+        return $this->modelDiscovery;
     }
 
     /**
@@ -107,8 +130,8 @@ class AutoTranslate extends Controller
         $this->vars['defaultLocale'] = Locale::getDefault();
         $this->vars['sourceLocale'] = $this->getConfiguredSourceLocale();
 
-        // Get translatable models from the system
-        $this->vars['translatableModels'] = $this->getTranslatableModels();
+        // Get translatable models from the system using ModelDiscoveryService
+        $this->vars['translatableModels'] = $this->getModelDiscovery()->getTranslatableModels();
     }
     
     /**
@@ -447,275 +470,6 @@ class AutoTranslate extends Controller
     }
     
     /**
-     * Get list of translatable models with detailed information
-     *
-     * @return array
-     */
-    protected function getTranslatableModels()
-    {
-        $models = [];
-        $plugins = $this->getAllPlugins();
-
-        foreach ($plugins as $pluginCode => $pluginObj) {
-            $pluginModels = $this->scanPluginForModels($pluginCode);
-            $models = array_merge($models, $pluginModels);
-        }
-
-        return $this->sortModelsByLabel($models);
-    }
-
-    /**
-     * Get all plugins from PluginManager
-     *
-     * @return array
-     */
-    protected function getAllPlugins()
-    {
-        $pluginManager = \System\Classes\PluginManager::instance();
-        return $pluginManager->getPlugins();
-    }
-
-    /**
-     * Scan plugin for translatable models
-     *
-     * @param string $pluginCode
-     * @return array
-     */
-    protected function scanPluginForModels($pluginCode)
-    {
-        $models = [];
-        [$author, $plugin] = explode('.', $pluginCode);
-
-        $modelsPath = $this->getPluginModelsPath($author, $plugin);
-
-        if (!is_dir($modelsPath)) {
-            return $models;
-        }
-
-        $modelFiles = glob($modelsPath . '/*.php');
-
-        foreach ($modelFiles as $modelFile) {
-            $modelInfo = $this->processModelFile($modelFile, $author, $plugin, $pluginCode);
-
-            if ($modelInfo) {
-                $models[$modelInfo['className']] = $modelInfo['data'];
-            }
-        }
-
-        return $models;
-    }
-
-    /**
-     * Get plugin models directory path
-     *
-     * @param string $author
-     * @param string $plugin
-     * @return string
-     */
-    protected function getPluginModelsPath($author, $plugin)
-    {
-        return plugins_path(strtolower($author) . '/' . strtolower($plugin) . '/models');
-    }
-
-    /**
-     * Process a model file
-     *
-     * @param string $modelFile
-     * @param string $author
-     * @param string $plugin
-     * @param string $pluginCode
-     * @return array|null
-     */
-    protected function processModelFile($modelFile, $author, $plugin, $pluginCode)
-    {
-        $modelName = basename($modelFile, '.php');
-
-        if ($this->shouldSkipModel($modelName)) {
-            return null;
-        }
-
-        $className = $this->buildModelClassName($author, $plugin, $modelName);
-
-        if (!class_exists($className)) {
-            return null;
-        }
-
-        try {
-            $instance = new $className();
-
-            if (!$this->isTranslatableModel($instance)) {
-                return null;
-            }
-
-            $fields = $this->getModelTranslatableFields($instance);
-
-            if (empty($fields)) {
-                return null;
-            }
-
-            return [
-                'className' => $className,
-                'data' => $this->buildModelInfo($instance, $className, $author, $plugin, $pluginCode, $modelName, $fields)
-            ];
-        } catch (\Exception $e) {
-            \Log::debug("Could not process model {$className}: " . $e->getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Check if model should be skipped
-     *
-     * @param string $modelName
-     * @return bool
-     */
-    protected function shouldSkipModel($modelName)
-    {
-        return ctype_lower($modelName[0]);
-    }
-
-    /**
-     * Build model class name
-     *
-     * @param string $author
-     * @param string $plugin
-     * @param string $modelName
-     * @return string
-     */
-    protected function buildModelClassName($author, $plugin, $modelName)
-    {
-        return ucfirst($author) . '\\' . ucfirst($plugin) . '\\Models\\' . $modelName;
-    }
-
-    /**
-     * Check if model is translatable
-     *
-     * @param \October\Rain\Database\Model $instance
-     * @return bool
-     */
-    protected function isTranslatableModel($instance)
-    {
-        return $instance->isClassExtendedWith(\RainLab\Translate\Behaviors\TranslatableModel::class);
-    }
-
-    /**
-     * Build model info array
-     *
-     * @param \October\Rain\Database\Model $instance
-     * @param string $className
-     * @param string $author
-     * @param string $plugin
-     * @param string $pluginCode
-     * @param string $modelName
-     * @param array $fields
-     * @return array
-     */
-    protected function buildModelInfo($instance, $className, $author, $plugin, $pluginCode, $modelName, array $fields)
-    {
-        $label = ucfirst($author) . ' › ' . $this->makeLabel($plugin) . ' › ' . $this->makeLabel($modelName);
-
-        return [
-            'label' => $label,
-            'plugin' => $pluginCode,
-            'author' => $author,
-            'pluginName' => $plugin,
-            'modelName' => $modelName,
-            'fields' => $fields,
-            'recordCount' => $className::count(),
-            'tableName' => $instance->getTable()
-        ];
-    }
-
-    /**
-     * Sort models by label
-     *
-     * @param array $models
-     * @return array
-     */
-    protected function sortModelsByLabel(array $models)
-    {
-        uasort($models, function($a, $b) {
-            return strcmp($a['label'], $b['label']);
-        });
-
-        return $models;
-    }
-
-    /**
-     * Get translatable fields from a model with their metadata
-     *
-     * @param \October\Rain\Database\Model $model
-     * @return array
-     */
-    protected function getModelTranslatableFields($model)
-    {
-        if (!isset($model->translatable) || !is_array($model->translatable)) {
-            return [];
-        }
-
-        $fields = [];
-
-        foreach ($model->translatable as $key => $value) {
-            // Handle both array formats: ['field'] and ['field' => 'index']
-            $fieldName = is_numeric($key) ? $value : $key;
-
-            // Determine field type based on naming conventions
-            $fieldType = $this->guessFieldType($fieldName);
-
-            $fields[$fieldName] = [
-                'name' => $fieldName,
-                'label' => $this->makeLabel($fieldName),
-                'type' => $fieldType,
-                'recommended' => $this->shouldFieldBeTranslated($fieldName, $fieldType)
-            ];
-        }
-
-        return $fields;
-    }
-
-    /**
-     * Guess the field type based on field name
-     *
-     * @param string $fieldName
-     * @return string
-     */
-    protected function guessFieldType($fieldName)
-    {
-        $richTextFields = ['content', 'description', 'body', 'text', 'excerpt', 'summary'];
-        $slugFields = ['slug', 'code', 'url'];
-        $metaFields = ['keywords', 'meta_title', 'meta_description', 'seo_title', 'seo_description'];
-
-        if (in_array(strtolower($fieldName), $richTextFields)) {
-            return 'richeditor';
-        }
-
-        if (in_array(strtolower($fieldName), $slugFields)) {
-            return 'slug';
-        }
-
-        if (in_array(strtolower($fieldName), $metaFields)) {
-            return 'meta';
-        }
-
-        return 'text';
-    }
-
-    /**
-     * Determine if a field should be translated by default
-     *
-     * @param string $fieldName
-     * @param string $fieldType
-     * @return bool
-     */
-    protected function shouldFieldBeTranslated($fieldName, $fieldType)
-    {
-        // Don't translate slugs or codes by default
-        $skipFields = ['slug', 'code', 'url', 'published', 'external', 'type'];
-
-        return !in_array(strtolower($fieldName), $skipFields);
-    }
-
-    /**
      * AJAX handler: Get model fields for selection
      */
     public function onGetModelFields()
@@ -728,7 +482,7 @@ class AutoTranslate extends Controller
 
         try {
             $instance = new $modelClass();
-            $fields = $this->getModelTranslatableFields($instance);
+            $fields = $this->getModelDiscovery()->getModelTranslatableFields($instance);
 
             return [
                 'fields' => $fields,
@@ -737,19 +491,6 @@ class AutoTranslate extends Controller
         } catch (\Exception $e) {
             return ['error' => $e->getMessage()];
         }
-    }
-    
-    /**
-     * Convert model name to readable label
-     *
-     * @param string $name
-     * @return string
-     */
-    protected function makeLabel($name)
-    {
-        // Convert PascalCase to Title Case with spaces
-        $label = preg_replace('/(?<!^)[A-Z]/', ' $0', $name);
-        return trim($label);
     }
 }
 
