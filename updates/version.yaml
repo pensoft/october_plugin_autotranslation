@@ -6,3 +6,5 @@
     - create_translation_jobs_table.php
 1.0.2:
     - 'Refactoring'
+1.0.3:
+    - 'Composer json file'
