@@ -1,0 +1,223 @@
+<?= Form::open(['id' => 'translateMessagesForm']) ?>
+
+<div class="scoreboard">
+    <div data-control="toolbar">
+        <div class="scoreboard-item title-value">
+            <h4>🌍 Translate Messages</h4>
+            <p>Automatically translate interface messages using DeepL AI</p>
+        </div>
+    </div>
+</div>
+
+<div class="form-preview autotranslate-ui">
+
+    <!-- Step 1: Source Language -->
+    <div class="translation-section">
+        <div class="section-header">
+            <span class="step-number">1</span>
+            <h3 class="section-title">Translation Source</h3>
+        </div>
+
+        <div class="source-language-card">
+            <div class="language-display">
+                <div class="language-badge source-badge">
+                    <i class="icon-language"></i>
+                    <span class="language-name"><?= e($sourceLocale->name) ?></span>
+                    <span class="language-code">(<?= $sourceLocale->code ?>)</span>
+                </div>
+            </div>
+            <div class="change-action">
+                <a href="<?= Backend::url('system/settings/update/pensoft/autotranslation/settings') ?>"
+                   class="btn btn-sm btn-primary">
+                    <i class="icon-cog"></i> Change Source Language
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2: Target Languages -->
+    <div class="translation-section">
+        <div class="section-header">
+            <span class="step-number">2</span>
+            <h3 class="section-title">Select Target Languages</h3>
+        </div>
+
+        <!-- Selected Languages Display -->
+        <div id="selectedLanguagesBadges" class="selected-languages-container" style="display: none;">
+            <div class="selected-languages-label">
+                <strong>Selected:</strong>
+                <span id="selectedCount" class="badge">0</span>
+            </div>
+            <div id="selectedLanguagesList" class="selected-languages-list"></div>
+        </div>
+
+        <!-- Language Selection Controls -->
+        <div class="language-selection-controls">
+            <button type="button" class="btn btn-sm btn-default" id="selectAllLanguages">
+                <i class="icon-check-square-o"></i> Select All
+            </button>
+            <button type="button" class="btn btn-sm btn-default" id="deselectAllLanguages">
+                <i class="icon-square-o"></i> Deselect All
+            </button>
+            <a href="<?= Backend::url('rainlab/translate/locales') ?>" class="btn btn-sm btn-success">
+                <i class="icon-plus"></i> Add more languages
+            </a>
+        </div>
+
+        <!-- Target Languages List -->
+        <div class="form-group">
+            <div class="checkbox-list-modern">
+                <?php foreach ($locales as $locale): ?>
+                    <?php if ($sourceLocale && $locale->code === $sourceLocale->code) continue; ?>
+                    <div class="checkbox-item">
+                        <input type="checkbox"
+                               name="target_locales[]"
+                               value="<?= $locale->code ?>"
+                               id="locale_<?= $locale->code ?>"
+                               class="target-locale-checkbox"
+                               data-locale-name="<?= e($locale->name) ?>"
+                               data-locale-code="<?= $locale->code ?>">
+                        <label for="locale_<?= $locale->code ?>" class="checkbox-label">
+                            <span class="checkbox-box"></span>
+                            <span class="locale-info">
+                                <span class="locale-name"><?= e($locale->name) ?></span>
+                                <span class="locale-code"><?= $locale->code ?></span>
+                            </span>
+                        </label>
+                    </div>
+                <?php endforeach ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 3: Translation Options -->
+    <div class="translation-section">
+        <div class="section-header">
+            <span class="step-number">3</span>
+            <h3 class="section-title">Translation Options</h3>
+        </div>
+
+        <div class="option-card">
+            <div class="option-content">
+                <div class="option-header">
+                    <i class="icon-refresh"></i>
+                    <strong>Overwrite Existing Translations</strong>
+                </div>
+                <div class="option-description">
+                    <p class="help-text">
+                        <span class="when-unchecked">
+                            <i class="icon-info-circle text-success"></i>
+                            Only empty translations will be filled
+                        </span>
+                        <span class="when-checked" style="display: none;">
+                            <i class="icon-warning text-warning"></i>
+                            All existing translations will be replaced
+                        </span>
+                    </p>
+                </div>
+            </div>
+            <div class="option-toggle">
+                <label class="toggle-switch">
+                    <input type="checkbox" name="overwrite" value="1" id="overwrite_existing">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="translation-section">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="icon-file-text-o"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value"><?= number_format($totalMessages) ?></div>
+                    <div class="stat-label">Total Messages</div>
+                </div>
+            </div>
+
+            <div class="stat-card" id="translationEstimate" style="display: none;">
+                <div class="stat-icon">
+                    <i class="icon-calculator"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value"><span id="estimateCount" data-total-messages="<?= $totalMessages ?>">0</span></div>
+                    <div class="stat-label">Est. Translations</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Usage Info -->
+    <div class="translation-section">
+        <div class="section-header-simple">
+            <i class="icon-tachometer"></i>
+            <h4>DeepL API Usage</h4>
+        </div>
+        <div id="usage-info-container" class="usage-container">
+            <div class="usage-placeholder">
+                <i class="icon-info-circle"></i>
+                <p>Click "Check API Usage" below to see your current usage</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="form-buttons-modern">
+        <button
+            type="button"
+            class="btn btn-primary btn-lg btn-translate"
+            data-request="onTranslateMessages"
+            data-request-confirm="Are you sure you want to translate the messages? This may take some time and will consume DeepL API credits."
+            data-stripe-load-indicator
+            data-attach-loading
+            id="translateButton"
+            disabled>
+            <span class="btn-text">
+                <i class="icon-language"></i>
+                Start Translation
+            </span>
+            <span class="btn-loading-text">
+                <i class="icon-spinner icon-spin"></i>
+                Translating...
+            </span>
+        </button>
+
+        <div class="secondary-actions">
+            <button
+                type="button"
+                class="btn btn-default"
+                data-request="onCheckUsage">
+                <i class="icon-tachometer"></i>
+                Check API Usage
+            </button>
+
+            <a href="<?= Backend::url('rainlab/translate/messages') ?>" class="btn btn-default">
+                <i class="icon-list-alt"></i>
+                View All Messages
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Translation Loading Overlay -->
+<div id="translationLoadingOverlay" class="translation-loading-overlay">
+    <div class="translation-loading-content">
+        <div class="translation-loader">
+            <div class="bounce1"></div>
+            <div class="bounce2"></div>
+            <div class="bounce3"></div>
+        </div>
+        <h3 class="translation-status-title">Translating Messages...</h3>
+        <div class="translation-status-languages"></div>
+        <div class="translation-warning">
+            <i class="icon-warning"></i>
+            <p>Please wait while translations are being processed.<br>
+            <strong>Do not close or refresh this page.</strong></p>
+        </div>
+    </div>
+</div>
+
+<?= Form::close() ?>

@@ -1,0 +1,89 @@
+# ===================================
+#  Form Field Definitions
+# ===================================
+
+tabs:
+    fields:
+        # API Configuration Tab
+        deepl_api_key:
+            tab: API Configuration
+            label: DeepL API Key
+            type: text
+            span: left
+            required: true
+            comment: Your DeepL API authentication key. Get one at https://www.deepl.com/pro-api
+            placeholder: Enter your DeepL API key
+            
+        deepl_server_type:
+            tab: API Configuration
+            label: Server Type
+            type: dropdown
+            span: right
+            required: true
+            default: free
+            options:
+                free: Free API (api-free.deepl.com)
+                pro: Pro API (api.deepl.com)
+            comment: Select your DeepL API plan type
+            
+        # Translation Options Tab
+        default_source_locale:
+            tab: Translation Options
+            label: Default Source Language
+            type: dropdown
+            span: left
+            required: true
+            comment: The language to translate FROM. All translation operations will use this as the source language.
+            placeholder: Select source language
+            
+        preserve_html:
+            tab: Translation Options
+            label: Preserve HTML Formatting
+            type: switch
+            span: right
+            default: true
+            comment: Maintain HTML structure in rich editor content
+            
+        excluded_fields:
+            tab: Translation Options
+            label: Excluded Field Names
+            type: textarea
+            span: full
+            size: small
+            comment: Field names to exclude from translation (one per line or comma-separated). Example slug, code, api_key, secret
+            placeholder: |
+                slug
+                code
+                api_key
+
+        # Performance Settings
+        batch_enabled:
+            tab: Performance
+            label: Enable Batch Translation
+            type: switch
+            span: left
+            default: true
+            comment: Use batch processing for faster translations and lower API costs (recommended)
+
+        batch_size:
+            tab: Performance
+            label: Batch Size
+            type: number
+            span: right
+            default: 50
+            min: 1
+            max: 50
+            comment: Number of texts to translate per API call (max 50 for DeepL)
+            trigger:
+                action: show
+                field: batch_enabled
+                condition: checked
+
+secondaryTabs:
+    fields:
+        usage_info:
+            tab: Usage & Info
+            type: partial
+            path: $/pensoft/autotranslation/models/settings/_usage_info.htm
+            span: full
+

@@ -1,0 +1,13 @@
+1.0.0:
+    - 'Initialize plugin'
+    - 'First version of Auto Translation'
+1.0.1:
+    - 'Create translation jobs table for tracking'
+    - create_translation_jobs_table.php
+1.0.2:
+    - 'Refactoring'
+1.0.3:
+    - 'Composer json file'
+
+4.0.1:
+    - 'Migrated to OctoberCMS 4 and PHP 8.2'

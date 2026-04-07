@@ -1,0 +1,53 @@
+<?php if ($usage): ?>
+    <div class="callout callout-success">
+        <?php if ($usage->character): ?>
+            <div style="margin-bottom: 15px;">
+                <p>
+                    <strong><i class="icon-font"></i> Character Usage:</strong><br>
+                    <?= number_format($usage->character->count) ?> / <?= number_format($usage->character->limit) ?> characters used
+                </p>
+
+                <?php
+                    $percentage = $usage->character->limit > 0
+                        ? ($usage->character->count / $usage->character->limit) * 100
+                        : 0;
+
+                    $barClass = $percentage > 80 ? 'bg-danger' : ($percentage > 50 ? 'bg-warning' : 'bg-success');
+                ?>
+
+                <div class="progress" style="height: 25px; margin-top: 8px;">
+                    <div class="progress-bar <?= $barClass ?>"
+                         role="progressbar"
+                         style="width: <?= $percentage ?>%"
+                         aria-valuenow="<?= $percentage ?>"
+                         aria-valuemin="0"
+                         aria-valuemax="100">
+                        <span style="line-height: 25px; font-weight: bold;"><?= number_format($percentage, 1) ?>%</span>
+                    </div>
+                </div>
+            </div>
+        <?php endif ?>
+
+        <?php if ($usage->document): ?>
+            <div style="margin-top: 15px;">
+                <p>
+                    <strong><i class="icon-file-text"></i> Document Usage:</strong><br>
+                    <?= number_format($usage->document->count) ?> / <?= number_format($usage->document->limit) ?> documents translated
+                </p>
+            </div>
+        <?php endif ?>
+
+        <?php if ($usage->anyLimitReached()): ?>
+            <div class="alert alert-danger" style="margin-top: 15px; margin-bottom: 0;">
+                <i class="icon-exclamation-triangle"></i>
+                <strong>Warning:</strong> Your DeepL API translation limit has been reached! Please upgrade your plan or wait for the next billing cycle.
+            </div>
+        <?php endif ?>
+    </div>
+<?php else: ?>
+    <div class="callout callout-danger">
+        <i class="icon-exclamation-triangle"></i>
+        <strong>Error:</strong> Unable to retrieve API usage information. Please check your DeepL API key configuration in the plugin settings.
+    </div>
+<?php endif ?>
+

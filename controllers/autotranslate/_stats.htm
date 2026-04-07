@@ -1,0 +1,61 @@
+<div class="callout callout-info">
+    <h4>Translation Statistics</h4>
+    <p>
+        <strong>Source:</strong> <?= e($sourceLocale) ?> → 
+        <strong>Target:</strong> <?= e($targetLocale) ?>
+    </p>
+    
+    <div class="stats-grid">
+        <div class="stat-item">
+            <div class="stat-label">Total Messages</div>
+            <div class="stat-value"><?= number_format($stats['messages_total']) ?></div>
+        </div>
+        
+        <div class="stat-item">
+            <div class="stat-label">Already Translated</div>
+            <div class="stat-value text-success"><?= number_format($stats['messages_translated']) ?></div>
+        </div>
+        
+        <div class="stat-item">
+            <div class="stat-label">Missing Translations</div>
+            <div class="stat-value text-warning"><?= number_format($stats['messages_missing']) ?></div>
+        </div>
+    </div>
+    
+    <?php if ($stats['messages_missing'] > 0): ?>
+        <p class="text-muted" style="margin-top: 10px;">
+            <i class="icon-info-circle"></i>
+            <?= number_format($stats['messages_missing']) ?> messages need translation.
+        </p>
+    <?php endif ?>
+</div>
+
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-top: 15px;
+    }
+    
+    .stat-item {
+        text-align: center;
+        padding: 15px;
+        background: white;
+        border-radius: 3px;
+        border: 1px solid #e0e0e0;
+    }
+    
+    .stat-label {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 5px;
+    }
+    
+    .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+    }
+</style>
+
