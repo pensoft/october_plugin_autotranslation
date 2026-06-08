@@ -2,6 +2,7 @@
 
 use Backend;
 use System\Classes\PluginBase;
+use RainLab\Translate\Models\Locale;
 
 /**
  * AutoTranslation Plugin Information File
@@ -46,7 +47,17 @@ class Plugin extends PluginBase
      */
     public function boot()
     {
-        //
+        // Cast RainLab.Translate Locale booleans without touching the plugin.
+        // is_default and is_enabled are stored as real booleans in PostgreSQL;
+        // casting them ensures isDirty() works correctly so saving a locale does
+        // not falsely flag is_default as changed (which would otherwise call
+        // makeDefault() and break enabling/disabling languages).
+        Locale::extend(function ($model) {
+            $model->addCasts([
+                'is_default' => 'boolean',
+                'is_enabled' => 'boolean',
+            ]);
+        });
     }
 
     /**

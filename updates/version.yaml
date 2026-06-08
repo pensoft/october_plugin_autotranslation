@@ -8,3 +8,5 @@
     - 'Refactoring'
 1.0.3:
     - 'Composer json file'
+1.0.4:
+    - ' Enable/disabel fix'
